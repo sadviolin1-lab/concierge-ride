@@ -1,0 +1,81 @@
+.bottomNav {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  right: 16px;
+  height: 64px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 20px;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 1000;
+  padding: 0 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.navItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 48px;
+  border-radius: 12px;
+  color: var(--color-text-2);
+  text-decoration: none;
+  font-size: 0.65rem;
+  font-weight: 600;
+  transition: all var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+  position: relative;
+  width: 60px;
+}
+
+.navItem:active {
+  transform: scale(0.95);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.navItem.active {
+  color: var(--color-primary);
+}
+
+.navItem svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 2.2;
+  transition: transform var(--transition-fast), stroke var(--transition-fast);
+}
+
+.navItem.active svg {
+  transform: translateY(-2px);
+}
+
+/* Elegant active indicator dot */
+.navItem.active::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: var(--color-primary);
+  box-shadow: 0 0 8px var(--color-primary);
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Hide on desktop */
+@media (min-width: 769px) {
+  .bottomNav {
+    display: none;
+  }
+}

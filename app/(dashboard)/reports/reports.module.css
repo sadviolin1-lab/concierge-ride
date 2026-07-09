@@ -1,0 +1,166 @@
+.page { display: flex; flex-direction: column; gap: 28px; animation: fadeInUp 0.4s ease both; }
+.header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.title { font-size: 1.6rem; font-weight: 800; background: var(--color-accent-grad); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -0.03em; }
+.subtitle { font-size: 0.9rem; color: var(--color-text-2); margin-top: 4px; }
+.loadingWrap { display: flex; align-items: center; gap: 12px; color: var(--color-text-2); padding: 40px; justify-content: center; }
+.noData { color: var(--color-text-3); font-size: 0.875rem; padding: 20px; text-align: center; }
+
+/* Summary */
+.summaryGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
+
+.summaryCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: fadeInUp 0.4s ease both;
+  transition: border-color var(--transition-fast);
+}
+.summaryCard:hover { border-color: var(--color-border-hover); }
+
+.summaryIcon { width: 44px; height: 44px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; }
+.summaryVal { font-size: 2rem; font-weight: 900; letter-spacing: -0.04em; line-height: 1; }
+.summaryLabel { font-size: 0.8rem; color: var(--color-text-2); font-weight: 500; }
+
+/* Two columns */
+.twoCol { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 768px) { .twoCol { grid-template-columns: 1fr; } }
+
+.section { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+.sectionTitle { font-size: 0.9rem; font-weight: 700; color: var(--color-text-2); text-transform: uppercase; letter-spacing: 0.06em; }
+
+/* Dept list */
+.deptList { display: flex; flex-direction: column; gap: 10px; }
+
+.deptRow { display: flex; align-items: center; gap: 10px; animation: fadeInUp 0.3s ease both; }
+.deptName { width: 100px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+
+.deptBarWrap { flex: 1; height: 8px; background: rgba(0, 0, 0, 0.05); border-radius: 4px; overflow: hidden; }
+.deptBar { height: 100%; background: var(--color-accent-grad); border-radius: 4px; transition: width 0.6s ease; }
+
+.deptNums { display: flex; gap: 8px; align-items: center; font-size: 0.78rem; font-weight: 600; }
+.deptTotal { background: rgba(0, 0, 0, 0.08); padding: 2px 8px; border-radius: 99px; color: var(--color-text-2); }
+
+/* Type list */
+.typeList { display: flex; flex-direction: column; gap: 12px; }
+
+.typeRow { display: flex; align-items: center; gap: 12px; }
+.typeLabel { width: 110px; font-size: 0.85rem; font-weight: 500; color: var(--color-text-1); flex-shrink: 0; }
+
+.typeBarWrap { flex: 1; height: 10px; background: rgba(0, 0, 0, 0.05); border-radius: 5px; overflow: hidden; }
+.typeBar { height: 100%; background: linear-gradient(90deg, #6C63FF, #4ECDC4); border-radius: 5px; transition: width 0.6s ease; }
+
+.typeCount { font-size: 0.85rem; font-weight: 700; color: var(--color-text-1); width: 24px; text-align: right; }
+
+
+/* ── Print layout modifications ── */
+@media print {
+  /* Hide standard web dashboard components completely */
+  :global(header),
+  :global(footer),
+  :global(aside),
+  :global(nav),
+  :global(main),
+  :global(button),
+  :global(select),
+  :global(input),
+  :global(label),
+  :global(.form-group),
+  :global(.form-select),
+  :global(.pageHeader),
+  :global([class*="sidebar"]),
+  :global([class*="header"]),
+  :global([class*="mobileHeader"]),
+  :global([class*="BottomNav"]),
+  :global([class*="bottom-nav"]),
+  :global(.btn),
+  :global(.btn-ghost),
+  :global(.backBtn),
+  :global(.selectors),
+  .page > :global(button),
+  .page > div:not(.printArea) {
+    display: none !important;
+  }
+
+  :global(body), :global(html) {
+    background: #fff !important;
+    color: #000 !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Force NextJS layout containers to display block (no sidebar grid) */
+  :global(div[style*="display: flex"]),
+  :global(main[class*="content"]),
+  :global(div[class*="layout"]),
+  :global(div[class*="main"]),
+  .page {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border: none !important;
+    background: none !important;
+    box-shadow: none !important;
+  }
+
+  .printArea {
+    display: block !important;
+    visibility: visible !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 20px !important;
+    box-sizing: border-box !important;
+  }
+
+  .printHeader {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: flex-start !important;
+    border-bottom: 2.5px solid #333 !important;
+    padding-bottom: 12px !important;
+    margin-bottom: 20px !important;
+  }
+
+  .printTitle {
+    font-size: 1.4rem !important;
+    font-weight: 800 !important;
+    color: #000 !important;
+    margin: 0 !important;
+    letter-spacing: -0.02em !important;
+  }
+
+  .printSubtitle {
+    font-size: 0.85rem !important;
+    color: #333 !important;
+    margin: 4px 0 0 0 !important;
+  }
+
+  .print-section {
+    page-break-inside: avoid !important;
+    margin-bottom: 24px !important;
+  }
+
+  /* Clean tables print formatting */
+  :global(table) {
+    page-break-inside: auto !important;
+  }
+  :global(tr) {
+    page-break-inside: avoid !important;
+    page-break-after: auto !important;
+  }
+}
+
+/* Hide on screen */
+@media screen {
+  .printArea {
+    display: none;
+  }
+}

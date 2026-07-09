@@ -1,0 +1,94 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--color-bg);
+  position: relative;
+  overflow: hidden;
+}
+
+.blob1, .blob2 {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.1;
+  pointer-events: none;
+}
+.blob1 { width: 400px; height: 400px; background: radial-gradient(circle, #F59E0B, transparent); top: -100px; right: -50px; }
+.blob2 { width: 300px; height: 300px; background: radial-gradient(circle, #6C63FF, transparent); bottom: -50px; left: -50px; }
+
+.card {
+  width: 100%;
+  max-width: 480px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: 48px 40px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  text-align: center;
+  animation: fadeInUp 0.5s ease both;
+}
+
+.iconWrap { display: flex; justify-content: center; }
+
+.iconRing {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(245, 158, 11, 0.12);
+  border: 2px solid rgba(245, 158, 11, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-warning);
+  animation: pulse-soft 2.5s ease-in-out infinite;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text-1);
+}
+
+.body {
+  font-size: 0.9rem;
+  color: var(--color-text-2);
+  line-height: 1.6;
+  max-width: 360px;
+}
+
+.infoCard {
+  width: 100%;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.infoRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.875rem;
+}
+
+.infoLabel {
+  color: var(--color-text-2);
+  font-weight: 500;
+}
+
+.infoValue {
+  color: var(--color-text-1);
+  font-weight: 600;
+}

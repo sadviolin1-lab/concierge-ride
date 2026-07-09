@@ -1,0 +1,106 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper functions ─────────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isUser(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function hasRole(role) {
+      return isSignedIn() && getUserData().role == role;
+    }
+
+    function isMasterAdmin() {
+      return hasRole('master_admin');
+    }
+
+    function isAdmin() {
+      return hasRole('admin') || isMasterAdmin();
+    }
+
+    function isDriver() {
+      return hasRole('driver') || isAdmin();
+    }
+
+    function isActive() {
+      return isSignedIn() && getUserData().status == 'active';
+    }
+
+    // ── Admin Bypass ─────────────────────────────────────────────────
+    // If a user is an admin, they have full access to everything.
+    // This avoids query validation issues with list queries.
+    match /{document=**} {
+      allow read, write: if isMasterAdmin();
+    }
+
+    // ── Users collection ─────────────────────────────────────────────
+    match /users/{uid} {
+      // Users can read their own profile; Admin and Driver can read all
+      allow read: if isUser(uid) || (isActive() && (isAdmin() || isDriver()));
+
+      // Only the user themselves can create their own profile (on registration)
+      allow create: if isUser(uid);
+
+      // Users can update their own profile (limited); Admin can update any except Master Admin
+      allow update: if isUser(uid) || (isActive() && isAdmin() && resource.data.role != 'master_admin' && request.resource.data.role != 'master_admin');
+
+      // Admin can delete user profiles except Master Admin
+      allow delete: if isActive() && isAdmin() && resource.data.role != 'master_admin';
+    }
+
+    // ── Shuttle Rides ─────────────────────────────────────────────────
+    match /shuttleRides/{rideId} {
+      // Any active user can read ride data (to see seat availability)
+      allow read: if isActive();
+
+      // Drivers and admins can create rides (assign vehicles to shifts)
+      allow create: if isActive() && isDriver();
+
+      // Any active user can update (to book/cancel a seat)
+      // Drivers/admin can also update vehicle type
+      allow update: if isActive();
+
+      // Only admin can delete rides
+      allow delete: if isActive() && isAdmin();
+    }
+
+    // ── General Requests ─────────────────────────────────────────────
+    match /requests/{requestId} {
+      // Requester can read their own; Driver/Admin can read all
+      allow read: if isActive() && (
+        isDriver() || resource.data.requesterId == request.auth.uid
+      );
+
+      // Any active staff/hr/admin can create requests
+      allow create: if isActive();
+
+      // Driver/Admin can update (approve/reject/start/complete)
+      allow update: if isActive() && isDriver();
+
+      // Only admin can delete
+      allow delete: if isActive() && isAdmin();
+    }
+
+    // ── Vehicles collection ───────────────────────────────────────────
+    match /vehicles/{vehicleId} {
+      // Any active user can read vehicle list
+      allow read: if isActive();
+
+      // Driver/Admin can update vehicles (drivers toggle isActive)
+      allow update: if isActive() && isDriver();
+
+      // Only admin can create or delete vehicles
+      allow create, delete: if isActive() && isAdmin();
+    }
+  }
+}
