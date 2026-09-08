@@ -305,7 +305,28 @@ export async function completeDirectRegistration(
   const generatedEmail = `${safeId}@conciergeride.local`;
 
   // Create Firebase Auth user
-  const userCredential = await createUserWithEmailAndPassword(auth, generatedEmail, data.password);
+  let userCredential;
+  try {
+    userCredential = await createUserWithEmailAndPassword(auth, generatedEmail, data.password);
+  } catch (err: any) {
+    if (err?.code === 'auth/email-already-in-use') {
+      try {
+        const existingCred = await signInWithEmailAndPassword(auth, generatedEmail, data.password);
+        const userDoc = await getDoc(doc(db, 'users', existingCred.user.uid));
+        if (!userDoc.exists()) {
+          // Orphaned auth user without Firestore document: reuse this account and recreate profile
+          userCredential = existingCred;
+        } else {
+          await firebaseSignOut(auth).catch(() => {});
+          throw err;
+        }
+      } catch (innerErr) {
+        throw err;
+      }
+    } else {
+      throw err;
+    }
+  }
   const user = userCredential.user;
   const uid = user.uid;
 
