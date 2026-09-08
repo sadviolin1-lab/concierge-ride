@@ -16,7 +16,7 @@ const T = {
   en: {
     heading:      'Create an Account',
     subHeading:   'Enter your details — Admin will review and approve your account.',
-    photoHint:    'Profile Photo',
+    photoHint:    'Profile Photo *',
     fullName:     'Full Name', nickname: 'Nickname',
     employeeId:   'Employee ID', department: 'Department',
     selectDept:   'Select department…',
@@ -41,11 +41,12 @@ const T = {
     errPurpose:   'Please select a purpose of usage.',
     errPhoneUsed: 'This Employee ID is already registered.',
     errRegister:  'Registration failed. Please try again.',
+    errPhoto:     'Please upload a profile photo.',
   },
   th: {
     heading:      'สมัครใช้งาน',
     subHeading:   'กรอกข้อมูลของคุณ — แอดมินจะตรวจสอบและอนุมัติบัญชีของคุณ',
-    photoHint:    'รูปโปรไฟล์',
+    photoHint:    'รูปโปรไฟล์ *',
     fullName:     'ชื่อ-นามสกุล', nickname: 'ชื่อเล่น',
     employeeId:   'รหัสพนักงาน', department: 'แผนก',
     selectDept:   'เลือกแผนก…',
@@ -70,6 +71,7 @@ const T = {
     errPurpose:   'กรุณาเลือกวัตถุประสงค์การใช้งาน',
     errPhoneUsed: 'รหัสพนักงานนี้ถูกลงทะเบียนแล้ว',
     errRegister:  'การสมัครล้มเหลว กรุณาลองใหม่',
+    errPhoto:     'กรุณาอัปโหลดรูปโปรไฟล์',
   },
 } as const;
 
@@ -142,6 +144,7 @@ export default function RegisterPage() {
     if (!form.employeeId.trim()) return t.errEmpId;
     if (!form.department)        return t.errDept;
     if (!form.purpose)           return t.errPurpose;
+    if (!photoFile)              return t.errPhoto;
     if (form.password.length < 6)                return t.errPwLen;
     if (form.password !== form.confirmPassword)   return t.errPwMatch;
     return null;
