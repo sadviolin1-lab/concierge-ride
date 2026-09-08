@@ -5,6 +5,7 @@
 export type UserRole = 'staff' | 'driver' | 'admin' | 'master_admin' | 'hr';
 export type UserStatus = 'pending' | 'active' | 'rejected' | 'suspended';
 export type UserPurpose = 'shuttle' | 'request' | 'both' | 'driver';
+export type EmploymentType = 'employee' | 'intern';
 
 export interface UserProfile {
   uid: string;
@@ -18,6 +19,7 @@ export interface UserProfile {
   status: UserStatus;
   photoURL: string | null;
   purpose?: UserPurpose;
+  employmentType?: EmploymentType;
   createdAt: number;
   updatedAt: number;
   rejectionReason?: string;

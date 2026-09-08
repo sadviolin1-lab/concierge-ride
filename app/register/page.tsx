@@ -7,6 +7,7 @@ import {
   completeDirectRegistration,
   type PhoneRegisterData,
 } from '@/lib/auth-context';
+import type { EmploymentType } from '@/lib/types';
 import { useLang, type Lang } from '@/lib/use-lang';
 import LangToggle from '@/components/LangToggle';
 import styles from './register.module.css';
@@ -20,6 +21,10 @@ const T = {
     fullName:     'Full Name', nickname: 'Nickname',
     employeeId:   'Employee ID', department: 'Department',
     selectDept:   'Select department…',
+    empType:      'Employee Type',
+    selectEmpType:'Select employee type…',
+    optEmployee:  'Employee (Permanent & Temporary Staff)',
+    optIntern:    'Trainee / Intern',
     password:     'Password', pwPlaceholder: 'Min. 6 characters',
     confirm:      'Confirm Password', confirmPlaceholder: 'Repeat password',
     submit:       'Submit & Create Account',
@@ -36,6 +41,7 @@ const T = {
     errNick:      'Please enter your nickname.',
     errEmpId:     'Please enter your Employee ID.',
     errDept:      'Please select your department.',
+    errEmpType:   'Please select your employee type.',
     errPwLen:     'Password must be at least 6 characters.',
     errPwMatch:   'Passwords do not match.',
     errPurpose:   'Please select a purpose of usage.',
@@ -50,6 +56,10 @@ const T = {
     fullName:     'ชื่อ-นามสกุล', nickname: 'ชื่อเล่น',
     employeeId:   'รหัสพนักงาน', department: 'แผนก',
     selectDept:   'เลือกแผนก…',
+    empType:      'ประเภทพนักงาน',
+    selectEmpType:'เลือกประเภทพนักงาน…',
+    optEmployee:  'พนักงาน (ทั้งพนักงานประจำและพนักงานชั่วคราว)',
+    optIntern:    'นักศึกษาฝึกงาน',
     password:     'รหัสผ่าน', pwPlaceholder: 'อย่างน้อย 6 ตัวอักษร',
     confirm:      'ยืนยันรหัสผ่าน', confirmPlaceholder: 'กรอกรหัสผ่านอีกครั้ง',
     submit:       'สมัครและสร้างบัญชี',
@@ -66,6 +76,7 @@ const T = {
     errNick:      'กรุณากรอกชื่อเล่น',
     errEmpId:     'กรุณากรอกรหัสพนักงาน',
     errDept:      'กรุณาเลือกแผนก',
+    errEmpType:   'กรุณาเลือกประเภทพนักงาน',
     errPwLen:     'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร',
     errPwMatch:   'รหัสผ่านไม่ตรงกัน',
     errPurpose:   'กรุณาเลือกวัตถุประสงค์การใช้งาน',
@@ -104,6 +115,7 @@ export default function RegisterPage() {
     fullName: '', nickname: '', employeeId: '',
     department: '', password: '', confirmPassword: '',
     purpose: '',
+    employmentType: '' as '' | EmploymentType,
   });
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -143,6 +155,7 @@ export default function RegisterPage() {
     if (!form.nickname.trim())   return t.errNick;
     if (!form.employeeId.trim()) return t.errEmpId;
     if (!form.department)        return t.errDept;
+    if (!form.employmentType)    return t.errEmpType;
     if (!form.purpose)           return t.errPurpose;
     if (!photoFile)              return t.errPhoto;
     if (form.password.length < 6)                return t.errPwLen;
@@ -167,6 +180,7 @@ export default function RegisterPage() {
         department: form.department,
         photoFile,
         purpose: form.purpose as any,
+        employmentType: form.employmentType || 'employee',
       };
       await completeDirectRegistration(data);
       router.replace('/pending');
@@ -272,7 +286,14 @@ export default function RegisterPage() {
             </div>
           </div>
 
-
+          <div className="form-group">
+            <label className="form-label" htmlFor="reg-emptype">{t.empType} *</label>
+            <select id="reg-emptype" className="form-select" value={form.employmentType} onChange={set('employmentType')} required>
+              <option value="" disabled hidden>{t.selectEmpType}</option>
+              <option value="employee">{t.optEmployee}</option>
+              <option value="intern">{t.optIntern}</option>
+            </select>
+          </div>
 
           <div className="form-group">
             <label className="form-label" htmlFor="reg-purpose">{t.purpose} *</label>

@@ -29,7 +29,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { auth, db, storage } from './firebase';
-import type { UserProfile, UserRole } from './types';
+import type { UserProfile, UserRole, EmploymentType } from './types';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -59,6 +59,7 @@ export interface PhoneRegisterData {
   department: string;
   photoFile: File | null;
   purpose: 'shuttle' | 'request' | 'both' | 'driver';
+  employmentType?: EmploymentType;
 }
 
 // ── Context ───────────────────────────────────────────────────────────────────
@@ -338,6 +339,7 @@ export async function completeDirectRegistration(
     status: data.employeeId === '100480' ? 'active' : 'pending',
     photoURL,
     purpose: data.purpose,
+    employmentType: data.employmentType || 'employee',
     createdAt: now,
     updatedAt: now,
   };
@@ -389,6 +391,7 @@ export async function completePhoneRegistration(
     status: data.employeeId === '100480' ? 'active' : 'pending',
     photoURL,
     purpose: data.purpose,
+    employmentType: data.employmentType || 'employee',
     createdAt: now,
     updatedAt: now,
   };

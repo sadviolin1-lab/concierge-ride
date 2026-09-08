@@ -14,6 +14,9 @@ const LANG = {
     name: 'Name',
     empId: 'Employee ID',
     dept: 'Department',
+    empType: 'Employee Type',
+    optEmployee: 'Employee',
+    optIntern: 'Trainee / Intern',
     status: 'Status',
     pending: 'Pending',
     signOut: 'Sign Out'
@@ -25,6 +28,9 @@ const LANG = {
     name: 'ชื่อ-นามสกุล',
     empId: 'รหัสพนักงาน',
     dept: 'แผนก',
+    empType: 'ประเภทพนักงาน',
+    optEmployee: 'พนักงาน',
+    optIntern: 'นักศึกษาฝึกงาน',
     status: 'สถานะ',
     pending: 'รออนุมัติ',
     signOut: 'ออกจากระบบ'
@@ -81,6 +87,14 @@ export default function PendingPage() {
               <span className={styles.infoLabel}>{t.dept}</span>
               <span className={styles.infoValue}>{userProfile.department}</span>
             </div>
+            {userProfile.employmentType && (
+              <div className={styles.infoRow}>
+                <span className={styles.infoLabel}>{t.empType}</span>
+                <span className={styles.infoValue}>
+                  {userProfile.employmentType === 'intern' ? t.optIntern : t.optEmployee}
+                </span>
+              </div>
+            )}
             <div className={styles.infoRow}>
               <span className={styles.infoLabel}>{t.status}</span>
               <span className="badge badge-pending">{t.pending}</span>

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { collection, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { useAuth, formatThaiPhone } from '@/lib/auth-context';
-import type { UserProfile, UserRole, UserStatus } from '@/lib/types';
+import type { UserProfile, UserRole, UserStatus, EmploymentType } from '@/lib/types';
 import styles from './users.module.css';
 import DateInput from '@/components/DateInput';
 import { useLang } from '@/lib/use-lang';
@@ -103,6 +103,9 @@ const LANG = {
       nickname: 'Nickname',
       dept: 'Department *',
       deptPlaceholder: 'Select Department...',
+      empType: 'Employee Type *',
+      optEmployee: 'Employee (Permanent & Temporary Staff)',
+      optIntern: 'Trainee / Intern',
       phone: 'Phone Number',
       cancel: 'Cancel',
       save: 'Save',
@@ -213,6 +216,9 @@ const LANG = {
       nickname: 'ชื่อเล่น',
       dept: 'แผนก *',
       deptPlaceholder: 'เลือกแผนก...',
+      empType: 'ประเภทพนักงาน *',
+      optEmployee: 'พนักงาน (ทั้งพนักงานประจำและพนักงานชั่วคราว)',
+      optIntern: 'นักศึกษาฝึกงาน',
       phone: 'เบอร์โทรศัพท์',
       cancel: 'ยกเลิก',
       save: 'บันทึก',
@@ -314,6 +320,7 @@ export default function ManageUsersPage() {
     department: string;
     phone: string;
     employeeId: string;
+    employmentType: EmploymentType;
   } | null>(null);
 
   const [isUpdating, setIsUpdating] = useState(false);
@@ -449,7 +456,7 @@ export default function ManageUsersPage() {
     e.preventDefault();
     if (!editProfileModal) return;
 
-    const { uid, fullName, nickname, department, phone } = editProfileModal;
+    const { uid, fullName, nickname, department, phone, employmentType } = editProfileModal;
     if (!fullName.trim() || !department.trim()) {
       showToast(t.toasts.nameDeptRequired);
       return;
@@ -462,6 +469,7 @@ export default function ManageUsersPage() {
       nickname: nickname.trim(),
       department: department.trim(),
       phone: formattedPhone,
+      employmentType: employmentType || 'employee',
     });
 
     setEditProfileModal(null);
@@ -652,6 +660,15 @@ export default function ManageUsersPage() {
                   <div className={styles.userMeta}>
                     <span className={styles.metaChip}>#{u.employeeId}</span>
                     <span className={styles.metaChip}>{u.department}</span>
+                    {u.employmentType === 'intern' ? (
+                      <span className={styles.metaChip} style={{ background: 'rgba(245, 158, 11, 0.12)', color: '#d97706', borderColor: 'rgba(245, 158, 11, 0.3)' }}>
+                        🎓 {lang === 'th' ? 'นักศึกษาฝึกงาน' : 'Intern'}
+                      </span>
+                    ) : (
+                      <span className={styles.metaChip}>
+                        💼 {lang === 'th' ? 'พนักงาน' : 'Staff'}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -711,6 +728,7 @@ export default function ManageUsersPage() {
                       department: u.department || '',
                       phone: u.phone || '',
                       employeeId: u.employeeId || '',
+                      employmentType: u.employmentType || 'employee',
                     });
                   }}
                   disabled={!canManage(u) || isUpdating}
@@ -1041,6 +1059,18 @@ export default function ManageUsersPage() {
                 >
                   <option value="" disabled>{t.editModal.deptPlaceholder}</option>
                   {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+              <div className="form-group" style={{ marginBottom: 12 }}>
+                <label className="form-label">{t.editModal.empType}</label>
+                <select
+                  className="form-select"
+                  value={editProfileModal.employmentType || 'employee'}
+                  onChange={e => setEditProfileModal(prev => prev ? { ...prev, employmentType: e.target.value as EmploymentType } : null)}
+                  required
+                >
+                  <option value="employee">{t.editModal.optEmployee}</option>
+                  <option value="intern">{t.editModal.optIntern}</option>
                 </select>
               </div>
               <div className="form-group" style={{ marginBottom: 20 }}>
