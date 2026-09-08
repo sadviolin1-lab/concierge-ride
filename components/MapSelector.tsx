@@ -85,6 +85,17 @@ const LANG = {
     estDistance: 'Est. Distance',
     estDuration: 'Est. Drive Time',
     totalStops: 'Total Stops',
+    pickOnMap: '📍 Pick on Map',
+    currentGps: '🎯 My Location',
+    pickerModalTitle: 'Select & Pin Location on Map',
+    confirmLocation: '✓ Confirm This Location',
+    locatingGps: 'Locating GPS…',
+    locatingAddress: 'Identifying address…',
+    satelliteView: 'Satellite',
+    roadmapView: 'Roadmap',
+    pinHintPicker: 'Move map to place pin at target spot',
+    gpsDenied: 'Could not retrieve GPS location. Please allow location access in your browser.',
+    openFullPicker: '📍 Open Full Map Picker',
   },
   th: {
     favoritesTitle: '⭐ สถานที่ใช้บ่อย & รายการโปรด',
@@ -111,6 +122,17 @@ const LANG = {
     estDistance: 'ระยะทางประมาณ',
     estDuration: 'เวลาเดินทางประมาณ',
     totalStops: 'จำนวนจุดแวะ',
+    pickOnMap: '📍 ปักหมุดบนแผนที่',
+    currentGps: '🎯 ตำแหน่งปัจจุบัน',
+    pickerModalTitle: 'เลือกและปักหมุดบนแผนที่',
+    confirmLocation: '✓ ยืนยันตำแหน่งนี้',
+    locatingGps: 'กำลังระบุพิกัด GPS…',
+    locatingAddress: 'กำลังระบุชื่อสถานที่…',
+    satelliteView: 'ภาพถ่ายดาวเทียม',
+    roadmapView: 'แผนที่ถนน',
+    pinHintPicker: 'เลื่อนแผนที่ให้หมุดตรงตำแหน่งที่ต้องการ',
+    gpsDenied: 'ไม่สามารถระบุพิกัด GPS ได้ กรุณาเปิดการอนุญาตเข้าถึงตำแหน่งบนเบราว์เซอร์',
+    openFullPicker: '📍 เปิดแผนที่เลือกพิกัดแบบละเอียด',
   },
 };
 
@@ -141,7 +163,7 @@ function loadGoogleMapsScript(): Promise<void> {
       const script = document.createElement('script');
       script.id = 'google-maps-script';
       const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry`;
       script.async = true;
       script.defer = true;
       script.onload = () => resolve();
@@ -151,6 +173,24 @@ function loadGoogleMapsScript(): Promise<void> {
   }
 
   return googleMapsLoadingPromise;
+}
+
+function extractPlaceNameFromGeocode(result: any): string {
+  if (!result) return '';
+  if (result.address_components && Array.isArray(result.address_components)) {
+    const poi = result.address_components.find((c: any) =>
+      c.types.includes('point_of_interest') ||
+      c.types.includes('establishment') ||
+      c.types.includes('premise')
+    );
+    if (poi) return poi.long_name;
+
+    const route = result.address_components.find((c: any) => c.types.includes('route'));
+    const streetNumber = result.address_components.find((c: any) => c.types.includes('street_number'));
+    if (route && streetNumber) return `${streetNumber.long_name} ${route.long_name}`;
+    if (route) return route.long_name;
+  }
+  return result.formatted_address ? result.formatted_address.split(',')[0].trim() : '';
 }
 
 // ─── Google Maps Component ──────────────────────────────────────────────────
@@ -515,6 +555,282 @@ function AddressSearch({
   );
 }
 
+// ─── Modern Location Picker Modal ──────────────────────────────────────────
+function LocationPickerModal({
+  isOpen,
+  initialLatLng,
+  initialTitle,
+  stopIndex,
+  onClose,
+  onConfirm,
+  lang,
+  t,
+}: {
+  isOpen: boolean;
+  initialLatLng: LatLng | null;
+  initialTitle?: string;
+  stopIndex: number;
+  onClose: () => void;
+  onConfirm: (lat: number, lng: number, address: string, placeName?: string) => void;
+  lang: 'en' | 'th';
+  t: typeof LANG.en;
+}) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstance = useRef<any>(null);
+  const geocoderRef = useRef<any>(null);
+  const geocodeTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [isFloating, setIsFloating] = useState(false);
+  const [coords, setCoords] = useState<{ lat: number; lng: number }>(() =>
+    initialLatLng ? { lat: initialLatLng.lat, lng: initialLatLng.lng } : { lat: 7.8804, lng: 98.3923 }
+  );
+  const [detectedPlace, setDetectedPlace] = useState(initialTitle || '');
+  const [detectedAddress, setDetectedAddress] = useState('');
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const [mapType, setMapType] = useState<'roadmap' | 'hybrid'>('roadmap');
+  const [isLocatingGps, setIsLocatingGps] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let isMounted = true;
+    loadGoogleMapsScript().then(() => {
+      if (!isMounted || !mapRef.current) return;
+      const google = (window as any).google;
+      geocoderRef.current = new google.maps.Geocoder();
+
+      const startCenter = initialLatLng
+        ? { lat: initialLatLng.lat, lng: initialLatLng.lng }
+        : { lat: 7.8804, lng: 98.3923 };
+
+      const map = new google.maps.Map(mapRef.current, {
+        center: startCenter,
+        zoom: initialLatLng ? 17 : 13,
+        mapTypeId: mapType,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+        zoomControl: false,
+        styles: [
+          { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
+          { featureType: 'transit', stylers: [{ visibility: 'simplified' }] },
+        ],
+      });
+      mapInstance.current = map;
+
+      map.addListener('dragstart', () => {
+        setIsFloating(true);
+      });
+
+      map.addListener('dragend', () => {
+        setIsFloating(false);
+      });
+
+      map.addListener('idle', () => {
+        setIsFloating(false);
+        const center = map.getCenter();
+        if (!center) return;
+        const lat = center.lat();
+        const lng = center.lng();
+        setCoords({ lat, lng });
+
+        if (geocodeTimeout.current) clearTimeout(geocodeTimeout.current);
+        setIsGeocoding(true);
+        geocodeTimeout.current = setTimeout(() => {
+          if (!geocoderRef.current) return;
+          geocoderRef.current.geocode({ location: { lat, lng } }, (results: any, status: any) => {
+            setIsGeocoding(false);
+            if (status === 'OK' && results && results[0]) {
+              const best = results[0];
+              const pName = extractPlaceNameFromGeocode(best);
+              setDetectedPlace(pName || (lang === 'th' ? 'พิกัดที่ปักหมุด' : 'Selected Pin'));
+              setDetectedAddress(best.formatted_address || `${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+            } else {
+              setDetectedPlace(lang === 'th' ? 'พิกัดที่ปักหมุด' : 'Selected Pin');
+              setDetectedAddress(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+            }
+          });
+        }, 350);
+      });
+
+      // Initial reverse geocode if initialLatLng is present
+      if (initialLatLng) {
+        geocoderRef.current.geocode({ location: startCenter }, (results: any, status: any) => {
+          if (status === 'OK' && results && results[0]) {
+            setDetectedAddress(results[0].formatted_address);
+            if (!initialTitle) {
+              setDetectedPlace(extractPlaceNameFromGeocode(results[0]));
+            }
+          }
+        });
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      if (geocodeTimeout.current) clearTimeout(geocodeTimeout.current);
+    };
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const handleGpsLocate = () => {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      alert(t.gpsDenied);
+      return;
+    }
+    setIsLocatingGps(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setIsLocatingGps(false);
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        if (mapInstance.current) {
+          mapInstance.current.panTo({ lat, lng });
+          mapInstance.current.setZoom(17);
+        }
+      },
+      (err) => {
+        setIsLocatingGps(false);
+        console.warn('Geolocation error:', err);
+        alert(t.gpsDenied);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  const handleToggleMapType = () => {
+    const nextType = mapType === 'roadmap' ? 'hybrid' : 'roadmap';
+    setMapType(nextType);
+    if (mapInstance.current) {
+      mapInstance.current.setMapTypeId(nextType);
+    }
+  };
+
+  const handleZoom = (delta: number) => {
+    if (!mapInstance.current) return;
+    mapInstance.current.setZoom(mapInstance.current.getZoom() + delta);
+  };
+
+  const handleSelectSearchResult = (display: string, lat: number, lng: number, placeName?: string) => {
+    if (mapInstance.current) {
+      mapInstance.current.panTo({ lat, lng });
+      mapInstance.current.setZoom(17);
+    }
+    setCoords({ lat, lng });
+    setDetectedPlace(placeName || display.split(',')[0].trim());
+    setDetectedAddress(display);
+  };
+
+  return (
+    <div className={styles.pickerModalOverlay} onClick={onClose}>
+      <div className={styles.pickerModal} onClick={e => e.stopPropagation()}>
+        {/* Modal Header */}
+        <div className={styles.pickerHeader}>
+          <div className={styles.pickerHeaderTitle}>
+            <span style={{ fontSize: '1.2rem' }}>📍</span>
+            <span>{t.pickerModalTitle} — {t.stopLabel} {stopIndex + 1}</span>
+          </div>
+          <button type="button" className={styles.pickerCloseBtn} onClick={onClose} aria-label="Close">
+            ✕
+          </button>
+        </div>
+
+        {/* Map Area */}
+        <div className={styles.pickerMapArea}>
+          {/* Floating Search Bar */}
+          <div className={styles.pickerSearchContainer}>
+            <AddressSearch
+              placeholder={t.searchHint}
+              hint=""
+              onSelectResult={handleSelectSearchResult}
+              noResultsText={t.noResults}
+              searchingText={t.searching}
+            />
+          </div>
+
+          <div ref={mapRef} className={styles.pickerMapInstance} />
+
+          {/* Center Target Pin */}
+          <div className={`${styles.centerPinContainer} ${isFloating ? styles.pinFloating : ''}`}>
+            <svg className={styles.centerPinSvg} viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 0C5.373 0 0 5.373 0 12C0 19.5 10.5 30.5 11.25 31.3C11.65 31.7 12.35 31.7 12.75 31.3C13.5 30.5 24 19.5 24 12C24 5.373 18.627 0 12 0Z" fill="#0284C7"/>
+              <circle cx="12" cy="11" r="5" fill="#FFFFFF"/>
+              <circle cx="12" cy="11" r="2.5" fill="#0284C7"/>
+            </svg>
+            <div className={styles.centerPinShadow} />
+          </div>
+          <div className={styles.crosshairCenterDot} />
+
+          {/* Floating Controls */}
+          <div className={styles.pickerFloatingControls}>
+            <button
+              type="button"
+              className={styles.mapControlFloatBtn}
+              onClick={handleGpsLocate}
+              title={t.currentGps}
+              disabled={isLocatingGps}
+            >
+              {isLocatingGps ? '⏳' : '🎯'}
+            </button>
+            <button
+              type="button"
+              className={`${styles.mapControlFloatBtn} ${mapType === 'hybrid' ? styles.activeLayer : ''}`}
+              onClick={handleToggleMapType}
+              title={mapType === 'roadmap' ? t.satelliteView : t.roadmapView}
+            >
+              {mapType === 'roadmap' ? '🛰️' : '🗺️'}
+            </button>
+            <button
+              type="button"
+              className={styles.mapControlFloatBtn}
+              onClick={() => handleZoom(1)}
+              title="Zoom in"
+            >
+              ➕
+            </button>
+            <button
+              type="button"
+              className={styles.mapControlFloatBtn}
+              onClick={() => handleZoom(-1)}
+              title="Zoom out"
+            >
+              ➖
+            </button>
+          </div>
+        </div>
+
+        {/* Bottom Confirmation Card */}
+        <div className={styles.pickerBottomCard}>
+          <div className={styles.pickerPlaceInfo}>
+            <div className={styles.pickerPlaceTitle}>
+              <span>📍</span>
+              <span>{isGeocoding ? t.locatingAddress : (detectedPlace || t.pinHintPicker)}</span>
+            </div>
+            <div className={styles.pickerPlaceAddress}>
+              {detectedAddress || t.pinHintPicker}
+            </div>
+            <div className={styles.pickerCoordsPill}>
+              📌 {coords.lat.toFixed(6)}, {coords.lng.toFixed(6)}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className={styles.pickerConfirmBtn}
+            onClick={() => {
+              onConfirm(coords.lat, coords.lng, detectedAddress, detectedPlace);
+              onClose();
+            }}
+          >
+            {t.confirmLocation}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main MapSelector ──────────────────────────────────────────────────────────
 export default function MapSelector({ destinations, onDestinationsChange, maxStops = 5 }: MapSelectorProps) {
   const { userProfile } = useAuth();
@@ -526,7 +842,55 @@ export default function MapSelector({ destinations, onDestinationsChange, maxSto
   const [savedFeedback, setSavedFeedback] = useState<string | null>(null);
   const [routeStats, setRouteStats] = useState<{ distanceText: string; durationText: string; totalMeters: number; totalSeconds: number } | null>(null);
 
+  // Modern Location Picker Modal state
+  const [pickerStopIndex, setPickerStopIndex] = useState<number | null>(null);
+  const [locatingIndex, setLocatingIndex] = useState<number | null>(null);
+
   const storageKey = `concierge_user_fav_places_${userProfile?.uid || 'default'}`;
+
+  const handleLocateCurrentGps = (index: number) => {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      alert(t.gpsDenied);
+      return;
+    }
+    setLocatingIndex(index);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        loadGoogleMapsScript().then(() => {
+          const google = (window as any).google;
+          const geocoder = new google.maps.Geocoder();
+          geocoder.geocode({ location: { lat, lng } }, (results: any, status: any) => {
+            setLocatingIndex(null);
+            let address = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+            let placeName = lang === 'th' ? 'ตำแหน่งปัจจุบันของฉัน' : 'My Current Location';
+            if (status === 'OK' && results && results[0]) {
+              address = results[0].formatted_address;
+              const poi = extractPlaceNameFromGeocode(results[0]);
+              if (poi) placeName = poi;
+            }
+            const newDests = [...destinations];
+            newDests[index] = {
+              ...newDests[index],
+              latLng: { lat, lng },
+              address: address,
+              title: newDests[index].title && newDests[index].title!.trim() ? newDests[index].title : placeName,
+            };
+            onDestinationsChange(newDests);
+          });
+        }).catch(() => {
+          setLocatingIndex(null);
+        });
+      },
+      (error) => {
+        setLocatingIndex(null);
+        console.warn('Geolocation error:', error);
+        alert(t.gpsDenied);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
 
   useEffect(() => {
     try {
@@ -847,6 +1211,30 @@ export default function MapSelector({ destinations, onDestinationsChange, maxSto
                       />
                     </div>
 
+                    {/* Quick Action Buttons: Pick on Map & GPS Current Location */}
+                    <div className={styles.stopQuickActionsRow}>
+                      <button
+                        type="button"
+                        className={styles.pickOnMapBtn}
+                        onClick={() => setPickerStopIndex(index)}
+                        title={t.pickOnMap}
+                      >
+                        <span>📍</span>
+                        <span>{t.pickOnMap}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        className={styles.gpsLocateBtn}
+                        onClick={() => handleLocateCurrentGps(index)}
+                        title={t.currentGps}
+                        disabled={locatingIndex === index}
+                      >
+                        <span>🎯</span>
+                        <span>{locatingIndex === index ? t.locatingGps : t.currentGps}</span>
+                      </button>
+                    </div>
+
                     {/* Place Name Title & Coordinates */}
                     <div className={styles.searchSection}>
                       <input
@@ -866,9 +1254,27 @@ export default function MapSelector({ destinations, onDestinationsChange, maxSto
                           <span className={styles.coordsText}>
                             {dest.latLng!.lat.toFixed(5)}, {dest.latLng!.lng.toFixed(5)}
                           </span>
-                          <span className={styles.coordsAddress}>
+                          <span className={styles.coordsAddress} title={dest.address}>
                             — {dest.address}
                           </span>
+                          <button
+                            type="button"
+                            onClick={() => setPickerStopIndex(index)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--color-primary, #0284c7)',
+                              cursor: 'pointer',
+                              fontSize: '0.74rem',
+                              fontWeight: 600,
+                              padding: '2px 6px',
+                              textDecoration: 'underline',
+                              flexShrink: 0,
+                            }}
+                            title="แก้ไขพิกัดบนแผนที่"
+                          >
+                            {lang === 'th' ? 'ปรับพิกัด' : 'Edit Pin'}
+                          </button>
                           <button
                             type="button"
                             onClick={() => {
@@ -884,7 +1290,7 @@ export default function MapSelector({ destinations, onDestinationsChange, maxSto
                         </div>
                       ) : (
                         <div className={styles.pinHintText}>
-                          💡 ค้นหาสถานที่ หรือคลิกบนแผนที่ด้านล่างเพื่อปักหมุด
+                          💡 ค้นหาสถานที่, กด &ldquo;📍 ปักหมุดบนแผนที่&rdquo; หรือกด &ldquo;🎯 ตำแหน่งปัจจุบัน&rdquo;
                         </div>
                       )}
                     </div>
@@ -995,12 +1401,55 @@ export default function MapSelector({ destinations, onDestinationsChange, maxSto
 
       {/* ── Interactive Google Map ── */}
       <div className={styles.mapWrapper}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--color-bg-2, #f8fafc)', borderBottom: '1px solid var(--color-border, #e2e8f0)' }}>
+          <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-text-2, #64748b)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>🗺️</span>
+            <span>{lang === 'th' ? 'แผนที่เส้นทางรวม' : 'Route Overview Map'}</span>
+          </span>
+          <button
+            type="button"
+            className={styles.pickOnMapBtn}
+            onClick={() => {
+              const target = destinations.findIndex(d => !d.latLng);
+              setPickerStopIndex(target !== -1 ? target : 0);
+            }}
+            style={{ fontSize: '0.74rem', padding: '4px 10px' }}
+          >
+            <span>📍</span>
+            <span>{t.openFullPicker}</span>
+          </button>
+        </div>
         <GoogleMapComponent
           destinations={destinations}
           onMarkerDragEnd={handleMarkerDragEnd}
           onRouteStatsChange={setRouteStats}
         />
       </div>
+
+      {/* ── Location Picker Modal (Google Maps Modern Center Crosshair Picker) ── */}
+      {pickerStopIndex !== null && destinations[pickerStopIndex] && (
+        <LocationPickerModal
+          isOpen={pickerStopIndex !== null}
+          initialLatLng={destinations[pickerStopIndex].latLng}
+          initialTitle={destinations[pickerStopIndex].title || destinations[pickerStopIndex].address}
+          stopIndex={pickerStopIndex}
+          onClose={() => setPickerStopIndex(null)}
+          onConfirm={(lat, lng, address, placeName) => {
+            const newDests = [...destinations];
+            const currentTitle = newDests[pickerStopIndex].title?.trim();
+            newDests[pickerStopIndex] = {
+              ...newDests[pickerStopIndex],
+              latLng: { lat, lng },
+              address: address,
+              title: currentTitle || placeName || address.split(',')[0].trim(),
+            };
+            onDestinationsChange(newDests);
+            setPickerStopIndex(null);
+          }}
+          lang={lang}
+          t={t}
+        />
+      )}
     </div>
   );
 }

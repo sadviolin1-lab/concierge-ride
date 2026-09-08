@@ -603,6 +603,358 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
+/* ─── Stop Card Action Buttons ──────────────────────────────────── */
+.stopQuickActionsRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.pickOnMapBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--color-primary-light, #e0f2fe);
+  border: 1px solid rgba(2, 132, 199, 0.35);
+  color: var(--color-primary, #0284c7);
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.pickOnMapBtn:hover {
+  background: #bae6fd;
+  border-color: var(--color-primary, #0284c7);
+  transform: translateY(-1px);
+}
+
+.gpsLocateBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: #f0fdf4;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  color: #15803d;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.gpsLocateBtn:hover {
+  background: #dcfce7;
+  border-color: #22c55e;
+  transform: translateY(-1px);
+}
+
+/* ─── Location Picker Modal (Google Maps Modern Experience) ───────── */
+.pickerModalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.2s ease;
+}
+
+.pickerModal {
+  position: relative;
+  width: 100%;
+  max-width: 860px;
+  height: 88vh;
+  max-height: 760px;
+  background: var(--color-surface, #ffffff);
+  border-radius: 20px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-border, #e2e8f0);
+}
+
+@media (max-width: 640px) {
+  .pickerModalOverlay {
+    padding: 0;
+  }
+  .pickerModal {
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+    border: none;
+  }
+}
+
+.pickerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 18px;
+  background: var(--color-surface, #ffffff);
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  z-index: 20;
+}
+
+.pickerHeaderTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: var(--color-text-1, #1e293b);
+}
+
+.pickerCloseBtn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--color-bg-2, #f1f5f9);
+  border: 1px solid var(--color-border, #cbd5e1);
+  color: var(--color-text-2, #64748b);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+.pickerCloseBtn:hover {
+  background: #fee2e2;
+  color: #ef4444;
+  border-color: #fca5a5;
+}
+
+/* Embedded Search Bar in Map Area */
+.pickerSearchContainer {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  z-index: 30;
+  max-width: 460px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  border-radius: 10px;
+}
+
+.pickerMapArea {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  overflow: hidden;
+}
+
+.pickerMapInstance {
+  width: 100%;
+  height: 100%;
+}
+
+/* Center Crosshair Target Pin */
+.centerPinContainer {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.centerPinContainer.pinFloating {
+  transform: translate(-50%, -125%);
+}
+
+.centerPinSvg {
+  width: 44px;
+  height: 52px;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.35));
+}
+
+.centerPinShadow {
+  width: 14px;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 50%;
+  margin-top: -3px;
+  filter: blur(1.5px);
+  transition: all 0.2s ease;
+}
+
+.centerPinContainer.pinFloating .centerPinShadow {
+  transform: scale(0.6);
+  opacity: 0.25;
+}
+
+.crosshairCenterDot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(2, 132, 199, 0.85);
+  border: 2px solid white;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.4);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 15;
+}
+
+/* Floating Controls on Map (GPS, Satellite, Zooms) */
+.pickerFloatingControls {
+  position: absolute;
+  right: 16px;
+  bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 25;
+}
+
+@media (max-width: 640px) {
+  .pickerFloatingControls {
+    bottom: 16px;
+    right: 12px;
+  }
+}
+
+.mapControlFloatBtn {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #cbd5e1);
+  color: var(--color-text-1, #1e293b);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.15s ease;
+  font-size: 16px;
+}
+.mapControlFloatBtn:hover {
+  background: var(--color-bg-2, #f8fafc);
+  transform: scale(1.05);
+}
+.mapControlFloatBtn.activeLayer {
+  background: var(--color-primary, #0284c7);
+  color: white;
+  border-color: var(--color-primary, #0284c7);
+}
+
+/* Bottom Confirmation Card / Sheet */
+.pickerBottomCard {
+  position: relative;
+  background: var(--color-surface, #ffffff);
+  border-top: 1px solid var(--color-border, #e2e8f0);
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  z-index: 25;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
+}
+
+@media (max-width: 640px) {
+  .pickerBottomCard {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 14px 16px;
+    gap: 12px;
+  }
+}
+
+.pickerPlaceInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.pickerPlaceTitle {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--color-text-1, #1e293b);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pickerPlaceAddress {
+  font-size: 0.78rem;
+  color: var(--color-text-2, #64748b);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.pickerCoordsPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-family: monospace;
+  color: var(--color-primary, #0284c7);
+  background: rgba(2, 132, 199, 0.08);
+  border-radius: 6px;
+  padding: 2px 6px;
+  width: fit-content;
+  margin-top: 2px;
+}
+
+.pickerConfirmBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: 12px;
+  background: var(--color-primary, #0284c7);
+  color: white;
+  font-size: 0.92rem;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+.pickerConfirmBtn:hover:not(:disabled) {
+  background: #0369a1;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(2, 132, 199, 0.4);
+}
+.pickerConfirmBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: translateY(0); }
@@ -611,3 +963,4 @@
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
