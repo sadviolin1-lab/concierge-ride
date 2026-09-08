@@ -102,8 +102,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let unsubscribeSnapshot: (() => void) | null = null;
+    let fallbackTimer: NodeJS.Timeout | null = setTimeout(() => {
+      setLoading(false);
+    }, 2000);
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      if (fallbackTimer) {
+        clearTimeout(fallbackTimer);
+        fallbackTimer = null;
+      }
       setLoading(true);
       try {
         if (user) {
@@ -113,7 +120,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             unsubscribeSnapshot();
           }
 
+          const profileFallback = setTimeout(() => {
+            setLoading(false);
+          }, 2500);
+
           unsubscribeSnapshot = onSnapshot(doc(db, 'users', user.uid), async (snap) => {
+            clearTimeout(profileFallback);
             if (snap.exists()) {
               let profile = snap.data() as UserProfile;
               
@@ -132,9 +144,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setUserProfile(profile);
             } else {
               setUserProfile(null);
+              firebaseSignOut(auth).catch(() => {});
             }
             setLoading(false);
           }, (error) => {
+            clearTimeout(profileFallback);
             console.error('Error in profile snapshot:', error);
             setLoading(false);
           });
@@ -157,6 +171,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => {
+      if (fallbackTimer) clearTimeout(fallbackTimer);
       unsubscribeAuth();
       if (unsubscribeSnapshot) {
         unsubscribeSnapshot();
@@ -235,6 +250,7 @@ export function useAuth(): AuthContextValue {
 
 /** Format a Thai phone number to E.164 (+66...) */
 export function formatThaiPhone(raw: string): string {
+  if (!raw || !raw.trim()) return '';
   const digits = raw.replace(/\D/g, '');
   if (digits.startsWith('0') && digits.length === 10) {
     return '+66' + digits.slice(1);
@@ -298,10 +314,14 @@ export async function completeDirectRegistration(
   // Upload profile photo if provided
   let photoURL: string | null = null;
   if (data.photoFile) {
-    const storageRef = ref(storage, `profile-photos/${uid}`);
-    await uploadBytes(storageRef, data.photoFile);
-    photoURL = await getDownloadURL(storageRef);
-    await updateProfile(user, { photoURL });
+    try {
+      const storageRef = ref(storage, `profilePictures/${uid}-${Date.now()}.jpg`);
+      await uploadBytes(storageRef, data.photoFile);
+      photoURL = await getDownloadURL(storageRef);
+      await updateProfile(user, { photoURL });
+    } catch (photoErr) {
+      console.warn('Failed to upload profile photo:', photoErr);
+    }
   }
 
   // Save user profile to Firestore
@@ -346,10 +366,14 @@ export async function completePhoneRegistration(
 
   let photoURL: string | null = null;
   if (data.photoFile) {
-    const storageRef = ref(storage, `profile-photos/${uid}`);
-    await uploadBytes(storageRef, data.photoFile);
-    photoURL = await getDownloadURL(storageRef);
-    await updateProfile(user, { photoURL });
+    try {
+      const storageRef = ref(storage, `profilePictures/${uid}-${Date.now()}.jpg`);
+      await uploadBytes(storageRef, data.photoFile);
+      photoURL = await getDownloadURL(storageRef);
+      await updateProfile(user, { photoURL });
+    } catch (photoErr) {
+      console.warn('Failed to upload profile photo:', photoErr);
+    }
   }
 
   const now = Date.now();

@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     const callerData = callerDoc.data();
     const callerRole = callerData?.role;
 
-    if (callerRole !== 'admin' && callerRole !== 'master_admin') {
+    if (callerRole !== 'admin' && callerRole !== 'master_admin' && callerRole !== 'hr') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -37,6 +37,11 @@ export async function POST(req: NextRequest) {
 
     if (!targetUid) {
       return NextResponse.json({ error: 'Missing targetUid' }, { status: 400 });
+    }
+
+    // Verify caller is not trying to delete themselves
+    if (callerUid === targetUid) {
+      return NextResponse.json({ error: 'Cannot delete your own account' }, { status: 400 });
     }
 
     // Verify target user is not master admin, unless caller is master admin

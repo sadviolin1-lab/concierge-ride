@@ -67,11 +67,18 @@ const LANG = {
 
 export default function AdminPage() {
   const router = useRouter();
-  const { userProfile } = useAuth();
+  const { userProfile, isAdmin, isHR } = useAuth();
   const { lang } = useLang();
   const t = LANG[lang];
   const [stats, setStats] = useState<Stats>({ totalUsers: 0, pendingUsers: 0, activeUsers: 0, pendingRequests: 0, totalRequests: 0, totalShuttleBookings: 0 });
   const [loading, setLoading] = useState(true);
+
+  const hasAccess = isAdmin || isHR;
+
+  // Protect route
+  useEffect(() => {
+    if (userProfile && !hasAccess) router.replace('/home');
+  }, [userProfile, hasAccess, router]);
 
   const fetchStats = useCallback(async () => {
     setLoading(true);
@@ -101,7 +108,11 @@ export default function AdminPage() {
     }
   }, []);
 
-  useEffect(() => { fetchStats(); }, [fetchStats]);
+  useEffect(() => {
+    if (hasAccess) fetchStats();
+  }, [hasAccess, fetchStats]);
+
+  if (!userProfile || !hasAccess) return null;
 
   const cards = [
     {

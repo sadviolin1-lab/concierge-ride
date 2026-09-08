@@ -82,6 +82,8 @@ input[type="password"]::-ms-clear {
 html {
   height: 100%;
   scroll-behavior: smooth;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -94,11 +96,18 @@ body {
   -webkit-font-smoothing: antialiased;
   line-height: 1.6;
   padding-bottom: 0; 
+  touch-action: manipulation;
 }
 
 @media (max-width: 768px) {
   body {
-    padding-bottom: 96px;
+    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  /* Prevent iOS Safari from auto-zooming when focusing inputs */
+  input, textarea, select {
+    font-size: 16px !important;
   }
 }
 
@@ -113,6 +122,7 @@ button {
   border: none;
   outline: none;
   background: transparent;
+  -webkit-tap-highlight-color: transparent;
 }
 
 input, textarea, select {
@@ -363,6 +373,10 @@ p { font-size: 1rem; color: var(--color-text-2); }
 .badge-rejected { background: #FEE2E2; color: #DC2626; border: 1px solid rgba(220, 38, 38, 0.2); }
 .badge-info, .badge-rescheduled { background: #E0E7FF; color: #4338CA; border: 1px solid rgba(67, 56, 202, 0.2); }
 .badge-neutral { background: #F1F5F9; color: var(--color-text-2); border: 1px solid var(--color-border); }
+
+.badge-urgent_pending { background: #FEF3C7; color: #B45309; border: 1px solid rgba(180, 83, 9, 0.3); font-weight: 700; }
+.badge-urgent_approved { background: #DCFCE7; color: #15803D; border: 1px solid rgba(21, 128, 61, 0.3); font-weight: 700; }
+.badge-urgent_rejected { background: #FEE2E2; color: #B91C1C; border: 1px solid rgba(185, 28, 28, 0.3); font-weight: 700; }
 
 .badge-driver { background: #E0F2FE; color: #0284C7; border: 1px solid rgba(2, 132, 199, 0.2); }
 .badge-hr { background: #FEF3C7; color: #D97706; border: 1px solid rgba(217, 119, 6, 0.2); }

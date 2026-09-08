@@ -5,61 +5,609 @@
   width: 100%;
 }
 
+/* ─── Favorites & Frequent Places Bar ────────────────────────────── */
+.favoritesSection {
+  background: var(--color-bg-2, rgba(2, 132, 199, 0.04));
+  border: 1px dashed var(--color-border, #e2e8f0);
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.favoritesHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.favoritesTitle {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-text-2, #64748b);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.favoritesSubtitle {
+  font-size: 0.72rem;
+  color: var(--color-text-3, #94a3b8);
+}
+
+.favoritesList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.favChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #cbd5e1);
+  color: var(--color-text-1, #1e293b);
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.favChip:hover {
+  background: var(--color-primary-light, #e0f2fe);
+  border-color: var(--color-primary, #0284c7);
+  color: var(--color-primary, #0284c7);
+  transform: translateY(-1px);
+}
+
+.favChipDelete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  color: var(--color-text-3, #94a3b8);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 2px;
+  line-height: 1;
+}
+
+.favChipDelete:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+/* ─── Route Distance & Duration Banner ──────────────────────────── */
+.routeStatsBanner {
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.08) 0%, rgba(14, 165, 233, 0.15) 100%);
+  border: 1px solid rgba(2, 132, 199, 0.25);
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  animation: fadeIn 0.25s ease;
+}
+
+.routeStatsLeft {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.statItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+
+.statValue {
+  font-weight: 700;
+  color: var(--color-primary, #0284c7);
+}
+
+.statLabel {
+  color: var(--color-text-2, #64748b);
+  font-size: 0.78rem;
+}
+
+/* ─── Stop List & Cards ─────────────────────────────────────────── */
 .stopsList {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.stopRow {
+.stopCard {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .stopCard {
+    padding: 12px 10px;
+    gap: 8px;
+  }
+}
+
+.stopCard:hover {
+  border-color: rgba(2, 132, 199, 0.35);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+}
+
+.stopTopBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.stopTopLeft {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: transparent;
-  border: none;
-  padding: 8px 12px;
-  border-radius: var(--radius-md);
+  min-width: 0;
 }
 
-.stopIcon {
-  width: 24px;
-  height: 24px;
+.stopBadge {
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  background: var(--color-primary);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.75rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+
+.stopNumberLabel {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--color-text-1, #1e293b);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.stopOriginTag {
+  font-size: 0.68rem;
   font-weight: 600;
+  color: var(--color-primary, #0284c7);
+  background: var(--color-primary-light, #e0f2fe);
+  border: 1px solid rgba(2, 132, 199, 0.25);
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+.dragHandle {
+  cursor: grab;
+  color: var(--color-text-3, #94a3b8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  transition: color 0.15s;
+}
+
+.dragHandle:hover {
+  color: var(--color-text-1, #1e293b);
+}
+
+.stopHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   flex-shrink: 0;
 }
 
-.autocompleteWrapper {
-  flex: 1;
+.actionPillBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+  min-height: 30px;
 }
 
+.saveFavPillBtn {
+  background: #fefce8;
+  border-color: #fde047;
+  color: #854d0e;
+}
 
+.saveFavPillBtn:hover {
+  background: #fef08a;
+  border-color: #eab308;
+  color: #713f12;
+  transform: translateY(-1px);
+}
 
-.removeBtn {
+.savedFavPillBtn {
+  background: #fef08a;
+  border-color: #eab308;
+  color: #713f12;
+  box-shadow: 0 1px 3px rgba(234, 179, 8, 0.25);
+}
+
+.favStarIcon {
+  font-size: 0.92rem;
+  line-height: 1;
+  color: #eab308;
+}
+
+.favBtnText {
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+
+.deleteStopBtn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid var(--color-border, #e2e8f0);
+  color: var(--color-text-3, #94a3b8);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.deleteStopBtn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+.addressSearchRow {
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+/* ─── Search & Address Container ────────────────────────────────── */
+.searchSection {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.stopTitleInput {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--color-text-1, #1e293b);
+  background: var(--color-bg-input, #ffffff);
+  border: 1.5px solid var(--color-border, #cbd5e1);
+  border-radius: 8px;
+  padding: 8px 12px;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.stopTitleInput:hover {
+  border-color: #94a3b8;
+}
+
+.stopTitleInput:focus {
+  background: #ffffff;
+  border-color: var(--color-primary, #0284c7);
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+  outline: none;
+}
+
+.coordsBadge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(2, 132, 199, 0.07);
+  border: 1px solid rgba(2, 132, 199, 0.2);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.76rem;
+  color: var(--color-text-2, #475569);
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.coordsText {
+  font-family: monospace;
+  color: var(--color-primary, #0284c7);
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.coordsAddress {
+  color: var(--color-text-2, #475569);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clearCoordsBtn {
   background: transparent;
   border: none;
-  color: var(--color-error);
-  font-size: 1.5rem;
+  color: var(--color-text-3, #94a3b8);
   cursor: pointer;
-  padding: 0 4px;
-  line-height: 1;
-  opacity: 0.6;
-  transition: opacity 0.2s ease;
+  padding: 2px 6px;
+  font-size: 12px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.clearCoordsBtn:hover {
+  color: #ef4444;
 }
 
-.removeBtn:hover {
-  opacity: 1;
+.pinHintText {
+  font-size: 0.75rem;
+  color: var(--color-text-3);
+  font-style: italic;
+  padding-left: 4px;
 }
 
+/* ─── Stop Details & Passengers ─────────────────────────────────── */
+.stopDetailsRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--color-bg-2, #f8fafc);
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border, #f1f5f9);
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.taskInput {
+  background: transparent;
+  border: none;
+  font-size: 0.82rem;
+  color: var(--color-text-1, #1e293b);
+  flex: 1;
+  min-width: 0;
+}
+.taskInput:focus {
+  outline: none;
+}
+
+.passengerToggleArea {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.passengerLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-text-1, #1e293b);
+  user-select: none;
+}
+
+.passengerCheckbox {
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-primary, #0284c7);
+}
+
+.passengerStepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--color-surface, #ffffff);
+  border: 1.5px solid var(--color-border, #cbd5e1);
+  border-radius: 10px;
+  padding: 2px 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.stepperBtn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-2, #f1f5f9);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+  color: var(--color-text-1, #1e293b);
+  font-size: 1.25rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.stepperBtn:hover:not(:disabled) {
+  background: var(--color-primary, #0284c7);
+  border-color: var(--color-primary, #0284c7);
+  color: white;
+}
+
+.stepperBtn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.stepperBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  background: var(--color-bg-2, #f8fafc);
+}
+
+.stepperDisplay {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+}
+
+.passengerCountInput {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  font-size: 1.1rem;
+  font-weight: 800;
+  text-align: center;
+  border: none;
+  background: transparent;
+  color: var(--color-primary, #0284c7);
+  -moz-appearance: textfield;
+}
+
+.passengerCountInput::-webkit-outer-spin-button,
+.passengerCountInput::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.passengerCountInput:focus {
+  outline: none;
+}
+
+.stepperUnit {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-2, #64748b);
+  user-select: none;
+}
+
+@media (max-width: 540px) {
+  .stopDetailsRow {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+  .passengerToggleArea {
+    padding-top: 8px;
+    border-top: 1px dashed var(--color-border, #e2e8f0);
+    justify-content: space-between;
+    width: 100%;
+  }
+}
+
+/* ─── Action Buttons (Add Stop / Round Trip) ─────────────────────── */
+.stopButtonsRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.addStopBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--color-surface, #ffffff);
+  border: 1.5px dashed var(--color-primary, #0284c7);
+  color: var(--color-primary, #0284c7);
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.addStopBtn:hover {
+  background: rgba(2, 132, 199, 0.08);
+  border-style: solid;
+}
+
+.roundTripBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--color-bg-2, #f8fafc);
+  border: 1px solid var(--color-border, #cbd5e1);
+  color: var(--color-text-2, #475569);
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.roundTripBtn:hover {
+  background: var(--color-surface, #ffffff);
+  color: var(--color-text-1, #1e293b);
+  border-color: var(--color-primary, #0284c7);
+}
+
+/* ─── Map Wrapper ───────────────────────────────────────────────── */
 .mapWrapper {
   width: 100%;
-  border-radius: var(--radius-lg);
+  border-radius: 14px;
   overflow: hidden;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--color-border, #e2e8f0);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }

@@ -73,6 +73,9 @@ const LANG = {
     status: {
       all: 'All',
       pending: 'Pending',
+      urgent_pending: '⚡ Urgent Pending',
+      urgent_approved: '⚡ Urgent Approved',
+      urgent_rejected: '⚡ Urgent Rejected',
       approved: 'Approved',
       rejected: 'Rejected',
       rescheduled: 'Rescheduled',
@@ -89,6 +92,11 @@ const LANG = {
     approve: 'Approve',
     reject: 'Reject',
     reschedule: 'Reschedule',
+    approveUrgent: '✅ Approve Urgent',
+    rejectUrgent: '❌ Reject Urgent',
+    urgentRejectTitle: 'Reject Urgent Request',
+    urgentRejectReasonLabel: 'Reason for rejection (Required)',
+    urgentSuggestDateLabel: 'Suggest alternate date (e.g. Tomorrow)',
     bolt: '⚡ Bolt Offer',
     boltModalTitle: '⚡ Suggest Bolt for Business',
     boltModalDesc: 'This will notify the requester that we suggest using Bolt for Business for this trip instead.',
@@ -118,6 +126,9 @@ const LANG = {
     status: {
       all: 'ทั้งหมด',
       pending: 'รอตรวจสอบ',
+      urgent_pending: '⚡ รออนุมัติงานด่วน',
+      urgent_approved: '⚡ อนุมัติงานด่วนแล้ว',
+      urgent_rejected: '⚡ ไม่อนุมัติงานด่วน',
       approved: 'อนุมัติ',
       rejected: 'ปฏิเสธ',
       rescheduled: 'ขอเลื่อนเวลา',
@@ -134,6 +145,11 @@ const LANG = {
     approve: 'อนุมัติ',
     reject: 'ปฏิเสธ',
     reschedule: 'เลื่อนเวลา',
+    approveUrgent: '✅ อนุมัติงานด่วน',
+    rejectUrgent: '❌ ไม่อนุมัติงานด่วน',
+    urgentRejectTitle: 'ไม่อนุมัติคำขอใช้งานเร่งด่วน',
+    urgentRejectReasonLabel: 'เหตุผลที่ไม่อนุมัติ (ระบุให้ผู้ขอทราบ) *',
+    urgentSuggestDateLabel: 'เสนอแนะวัน/เวลาที่แนะนำให้จองใหม่ (เช่น วันพรุ่งนี้)',
     bolt: '⚡ เสนอ Bolt',
     boltModalTitle: '⚡ แนะนำ Bolt for Business',
     boltModalDesc: 'ระบบจะแจ้งผู้ร้องขอว่าเราแนะนำให้ใช้บริการ Bolt for Business แทน เนื่องจากเราไม่สามารถจัดการได้ตามคำขอ',
@@ -164,7 +180,7 @@ export default function ApprovalsPage() {
   const [filter, setFilter] = useState<RequestStatus | 'all'>('pending');
 
   const [activeReqId, setActiveReqId] = useState<string | null>(null);
-  const [actionType, setActionType] = useState<'approve' | 'reject' | 'reschedule' | 'bolt' | null>(null);
+  const [actionType, setActionType] = useState<'approve' | 'reject' | 'reschedule' | 'bolt' | 'approve_urgent' | 'reject_urgent' | null>(null);
   const [reviewNote, setReviewNote] = useState('');
   const [rescheduledDate, setRescheduledDate] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
@@ -244,6 +260,11 @@ export default function ApprovalsPage() {
 
   const handleAction = async () => {
     if (!activeReqId || !actionType || !userProfile) return;
+    if (actionType === 'reject_urgent' && !reviewNote.trim()) {
+      alert(lang === 'th' ? 'กรุณาระบุเหตุผลที่ไม่อนุมัติคำขอด่วน' : 'Please provide a reason for rejecting the urgent request.');
+      return;
+    }
+
     setActionLoading(true);
     try {
       const statusMap = {
@@ -251,6 +272,8 @@ export default function ApprovalsPage() {
         reject: 'rejected',
         reschedule: 'rescheduled',
         bolt: 'bolt_suggested',
+        approve_urgent: 'urgent_approved',
+        reject_urgent: 'urgent_rejected',
       } as const;
       
       const updateData: Partial<GeneralRequest> = {
@@ -261,8 +284,13 @@ export default function ApprovalsPage() {
         updatedAt: Date.now(),
       };
 
-      if (actionType === 'reschedule' && rescheduledDate) {
+      if (actionType === 'approve_urgent') {
+        updateData.urgentApprovedAt = Date.now();
+      }
+
+      if ((actionType === 'reschedule' || actionType === 'reject_urgent') && rescheduledDate) {
         updateData.rescheduledDate = rescheduledDate;
+        updateData.suggestedDate = rescheduledDate;
       }
 
       await updateDoc(doc(db, 'requests', activeReqId), updateData);
@@ -304,7 +332,7 @@ export default function ApprovalsPage() {
       </div>
 
       <div className={styles.filters} role="tablist" aria-label="Filter requests">
-        {(['all', 'pending', 'approved', 'in_progress', 'completed', 'rejected', 'rescheduled'] as const).map(f => (
+        {(['all', 'urgent_pending', 'pending', 'urgent_approved', 'approved', 'in_progress', 'completed', 'urgent_rejected', 'rejected', 'rescheduled'] as const).map(f => (
           <button
             key={f}
             id={`filter-${f}`}
@@ -477,6 +505,32 @@ export default function ApprovalsPage() {
                   </div>
                 )}
 
+                {req.status === 'urgent_pending' && (
+                  <div style={{
+                    background: 'rgba(245, 158, 11, 0.1)',
+                    border: '1.5px solid rgba(245, 158, 11, 0.4)',
+                    borderRadius: '12px',
+                    padding: '12px 14px',
+                    margin: '12px 0',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 800, color: '#b45309', fontSize: '0.9rem' }}>
+                      <span>⚡</span>
+                      <span>{lang === 'th' ? 'คำขอขอใช้งานเร่งด่วน (รอพิจารณาอนุมัติ)' : 'Urgent Service Pre-Request (Pending Review)'}</span>
+                    </div>
+                    {req.urgentReason && (
+                      <div style={{ fontSize: '0.84rem', color: '#92400e', lineHeight: 1.5 }}>
+                        <strong>{lang === 'th' ? 'เหตุผลความจำเป็นเร่งด่วน:' : 'Reason for Urgency:'}</strong> {req.urgentReason}
+                      </div>
+                    )}
+                    <div style={{ fontSize: '0.8rem', color: '#b45309' }}>
+                      📍 <strong>{lang === 'th' ? 'จุดหมายโดยสังเขป:' : 'Rough Destination:'}</strong> {req.destination}
+                    </div>
+                  </div>
+                )}
+
                 <div className={styles.cardActions} style={{ flexWrap: 'wrap', gap: '8px', width: '100%', alignItems: 'center' }}>
                   {(req.status === 'approved' || req.status === 'in_progress') && (
                     <a
@@ -515,7 +569,44 @@ export default function ApprovalsPage() {
                     </button>
                   )}
 
-                  {/* Pending actions for Drivers/Admins */}
+                  {/* Urgent Pending Actions for Drivers/Admins */}
+                  {canManage && req.status === 'urgent_pending' && (
+                    <>
+                      <button 
+                        className="btn btn-gradient" 
+                        style={{ flex: 1, background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)' }}
+                        onClick={() => { setActiveReqId(req.id); setActionType('approve_urgent'); }}
+                      >
+                        {t.approveUrgent}
+                      </button>
+                      <button 
+                        className="btn btn-outline-danger" 
+                        style={{ flex: 1 }}
+                        onClick={() => { 
+                          setActiveReqId(req.id); 
+                          setActionType('reject_urgent'); 
+                          const d = new Date();
+                          d.setDate(d.getDate() + 1);
+                          setRescheduledDate(d.toISOString().slice(0, 10));
+                        }}
+                      >
+                        {t.rejectUrgent}
+                      </button>
+                      <button
+                        style={{
+                          flex: 1, padding: '8px 10px', borderRadius: '10px', border: '1.5px solid #1DC361',
+                          background: 'rgba(29,195,97,0.08)', color: '#1DC361', cursor: 'pointer',
+                          fontWeight: 700, fontSize: '0.82rem', display: 'flex', alignItems: 'center',
+                          justifyContent: 'center', gap: 4,
+                        }}
+                        onClick={() => { setActiveReqId(req.id); setActionType('bolt'); }}
+                      >
+                        ⚡ {lang === 'th' ? 'เสนอ Bolt' : 'Bolt Offer'}
+                      </button>
+                    </>
+                  )}
+
+                  {/* Standard Pending actions for Drivers/Admins */}
                   {canManage && req.status === 'pending' && (
                     <>
                       <button 
@@ -641,6 +732,80 @@ export default function ApprovalsPage() {
                     style={{ padding: '10px 24px', borderRadius: 10, border: 'none', background: '#1DC361', color: 'white', fontWeight: 700, cursor: 'pointer', fontSize: '0.95rem', minWidth: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
                   >
                     {actionLoading ? <div className="spinner" style={{ width: 16, height: 16 }} /> : <><span>⚡</span> {lang === 'th' ? 'ส่งข้อเสนอ' : 'Send Offer'}</>}
+                  </button>
+                </div>
+              </>
+            ) : actionType === 'reject_urgent' ? (
+              <>
+                <h2 style={{ marginBottom: '12px', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>❌</span>
+                  <span>{t.urgentRejectTitle}</span>
+                </h2>
+                <p style={{ fontSize: '0.85rem', color: 'var(--color-text-2)', marginBottom: '16px' }}>
+                  {lang === 'th'
+                    ? 'กรุณาระบุเหตุผลที่ไม่สามารถให้บริการงานด่วนได้ และเสนอวันที่แนะนำให้ผู้ใช้จองใหม่'
+                    : 'Please provide a reason why this urgent request cannot be accommodated and suggest an alternate date.'}
+                </p>
+                
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-text-1)', marginBottom: '6px' }}>
+                    {t.urgentRejectReasonLabel}
+                  </label>
+                  <textarea 
+                    value={reviewNote}
+                    onChange={e => setReviewNote(e.target.value)}
+                    rows={3}
+                    placeholder={lang === 'th' ? 'เช่น รถและคนขับติดภารกิจเต็มทุกคันในช่วงบ่ายนี้ ไม่สามารถรับงานเพิ่มได้' : 'e.g. All vehicles are fully booked for this afternoon.'}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', background: 'rgba(0,0,0,0.02)', border: '1.5px solid #ef4444', color: 'var(--color-text-1)', resize: 'vertical' }}
+                    required
+                  />
+                </div>
+
+                <div style={{ marginBottom: '24px' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-text-1)', marginBottom: '6px' }}>
+                    {t.urgentSuggestDateLabel}
+                  </label>
+                  <DateInput
+                    value={rescheduledDate}
+                    onChange={e => setRescheduledDate(e.target.value)}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', background: 'rgba(0,0,0,0.02)', border: '1px solid var(--color-border)', color: 'var(--color-text-1)' }}
+                  />
+                </div>
+                
+                <div style={{ display: 'flex', gap: '16px', justifyContent: 'flex-end' }}>
+                  <button className="btn-ghost" onClick={() => setActiveReqId(null)} disabled={actionLoading} style={{ padding: '10px 24px', fontSize: '1rem' }}>{t.cancel}</button>
+                  <button className="btn btn-outline-danger" onClick={handleAction} disabled={actionLoading} style={{ padding: '10px 24px', fontSize: '1rem', minWidth: '120px' }}>
+                    {actionLoading ? <div className="spinner" style={{ width: 16, height: 16 }} /> : t.submit}
+                  </button>
+                </div>
+              </>
+            ) : actionType === 'approve_urgent' ? (
+              <>
+                <h2 style={{ marginBottom: '12px', color: '#15803d', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>✅</span>
+                  <span>{t.approveUrgent}</span>
+                </h2>
+                <p style={{ fontSize: '0.88rem', color: 'var(--color-text-2)', marginBottom: '16px' }}>
+                  {lang === 'th'
+                    ? 'เมื่อกดอนุมัติงานด่วนแล้ว ระบบจะส่งการแจ้งเตือนไปยังผู้ร้องขอ เพื่อให้ผู้ร้องขอกรอกรายละเอียดจุดหมาย เส้นทาง และจำนวนผู้โดยสารทันที'
+                    : 'Approving this urgent request will immediately notify the requester to complete full route & destination details.'}
+                </p>
+
+                <div style={{ marginBottom: '24px' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--color-text-2)', marginBottom: '6px' }}>{t.addNote}</label>
+                  <textarea 
+                    value={reviewNote}
+                    onChange={e => setReviewNote(e.target.value)}
+                    rows={2}
+                    placeholder={lang === 'th' ? 'ข้อความเพิ่มเติมถึงผู้ขอ (ไม่บังคับ)' : 'Optional note to requester...'}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', background: 'rgba(0,0,0,0.02)', border: '1px solid var(--color-border)', color: 'var(--color-text-1)', resize: 'vertical' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '16px', justifyContent: 'flex-end' }}>
+                  <button className="btn-ghost" onClick={() => setActiveReqId(null)} disabled={actionLoading} style={{ padding: '10px 24px', fontSize: '1rem' }}>{t.cancel}</button>
+                  <button className="btn btn-gradient" onClick={handleAction} disabled={actionLoading} style={{ padding: '10px 24px', fontSize: '1rem', minWidth: '120px', background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)' }}>
+                    {actionLoading ? <div className="spinner" style={{ width: 16, height: 16 }} /> : t.submit}
                   </button>
                 </div>
               </>

@@ -50,8 +50,8 @@ export default function LoginPage() {
 
   // Wait for the context to reflect the logged in state, then redirect
   useEffect(() => {
-    if (!loading && firebaseUser && userProfile) {
-      router.replace('/');
+    if (!loading && firebaseUser && userProfile && userProfile.status === 'active') {
+      router.replace('/home');
     }
   }, [loading, firebaseUser, userProfile, router]);
 

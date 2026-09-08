@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useLang } from '@/lib/use-lang';
 import type { GeneralRequest, RequestStatus, Destination } from '@/lib/types';
 import { getNavigationUrl } from '@/lib/maps';
+import MapSelector from '@/components/MapSelector';
 import DateInput from '@/components/DateInput';
 import styles from './requests.module.css';
 
@@ -82,6 +83,9 @@ const LANG = {
     status: {
       all: 'All',
       pending: 'Pending',
+      urgent_pending: '⚡ Urgent Pending',
+      urgent_approved: '⚡ Urgent Approved',
+      urgent_rejected: '⚡ Urgent Rejected',
       approved: 'Approved',
       rejected: 'Rejected',
       rescheduled: 'Rescheduled',
@@ -98,6 +102,13 @@ const LANG = {
     proofOfWork: 'Proof of Work',
     completionNote: 'Completion Note',
     completedAtLabel: 'Completed At:',
+    urgentPendingBanner: '⏳ Your urgent request was sent to Admin & Drivers and is awaiting approval...',
+    urgentApprovedBanner: '🎉 Urgent request approved! Please provide route and stop details for the driver.',
+    fillUrgentDestBtn: '📍 Fill Destination & Stops',
+    urgentRejectedBanner: '❌ Urgent request could not be accommodated.',
+    rescheduleToNextDayBtn: '📅 Reschedule to Another Date',
+    urgentModalTitle: '⚡ Enter Route Details for Urgent Request',
+    confirmUrgentTripBtn: '🚀 Confirm Details & Dispatch Driver',
   },
   th: {
     title: 'คำขอของฉัน',
@@ -112,6 +123,9 @@ const LANG = {
     status: {
       all: 'ทั้งหมด',
       pending: 'รอตรวจสอบ',
+      urgent_pending: '⚡ รออนุมัติงานด่วน',
+      urgent_approved: '⚡ อนุมัติงานด่วนแล้ว',
+      urgent_rejected: '⚡ ไม่อนุมัติงานด่วน',
       approved: 'อนุมัติ',
       rejected: 'ปฏิเสธ',
       rescheduled: 'ขอเลื่อนเวลา',
@@ -128,6 +142,13 @@ const LANG = {
     proofOfWork: 'หลักฐานการทำงาน',
     completionNote: 'บันทึกหลังเสร็จงาน',
     completedAtLabel: 'เสร็จสิ้นเมื่อ:',
+    urgentPendingBanner: '⏳ คำขอใช้งานด่วนของคุณถูกส่งไปยัง Admin & คนขับเรียบร้อยแล้ว อยู่ระหว่างรอการพิจารณาอนุมัติ...',
+    urgentApprovedBanner: '🎉 คำขอใช้งานด่วนได้รับการอนุมัติแล้ว! กรุณาระบุรายละเอียดจุดหมาย เส้นทาง และผู้โดยสาร',
+    fillUrgentDestBtn: '📍 กรอกรายละเอียดจุดหมายและเส้นทาง',
+    urgentRejectedBanner: '❌ คำขอใช้งานด่วนไม่สามารถให้บริการได้',
+    rescheduleToNextDayBtn: '📅 ย้ายไปจองในวันถัดไป / วันอื่น',
+    urgentModalTitle: '⚡ ระบุรายละเอียดจุดหมายสำหรับคำขอด่วน',
+    confirmUrgentTripBtn: '🚀 บันทึกรายละเอียดและยืนยันการเดินทาง',
   }
 } as const;
 
@@ -150,6 +171,17 @@ export default function RequestsPage() {
   const [editContactPhone, setEditContactPhone] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
 
+  // Urgent Filling Modal State
+  const [fillingUrgentReq, setFillingUrgentReq] = useState<GeneralRequest | null>(null);
+  const [urgentStops, setUrgentStops] = useState<Destination[]>([]);
+  const [savingUrgentStops, setSavingUrgentStops] = useState(false);
+
+  // Urgent Reschedule Modal State
+  const [reschedulingUrgentReq, setReschedulingUrgentReq] = useState<GeneralRequest | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleTime, setRescheduleTime] = useState('09:00');
+  const [savingReschedule, setSavingReschedule] = useState(false);
+
   useEffect(() => {
     if (editingRequest) {
       setEditTitle(editingRequest.title);
@@ -160,6 +192,37 @@ export default function RequestsPage() {
       setEditContactPhone(editingRequest.contactPhone || '');
     }
   }, [editingRequest]);
+
+  useEffect(() => {
+    if (fillingUrgentReq) {
+      if (fillingUrgentReq.destinations && fillingUrgentReq.destinations.length > 0) {
+        setUrgentStops(fillingUrgentReq.destinations);
+      } else {
+        setUrgentStops([{
+          title: fillingUrgentReq.destination || '',
+          address: '',
+          latLng: fillingUrgentReq.destinationLatLng || null,
+          description: '',
+          hasPassengers: false,
+          passengerCount: 1,
+        }]);
+      }
+    }
+  }, [fillingUrgentReq]);
+
+  useEffect(() => {
+    if (reschedulingUrgentReq) {
+      const defaultDate = reschedulingUrgentReq.suggestedDate || reschedulingUrgentReq.rescheduledDate || '';
+      if (defaultDate) {
+        setRescheduleDate(defaultDate);
+      } else {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        setRescheduleDate(tomorrow.toISOString().slice(0, 10));
+      }
+      setRescheduleTime(reschedulingUrgentReq.requestedTime || '09:00');
+    }
+  }, [reschedulingUrgentReq]);
 
   const fetchRequests = useCallback(async () => {
     if (!userProfile) return;
@@ -204,7 +267,7 @@ export default function RequestsPage() {
 
       {/* Filter tabs */}
       <div className={styles.filters} role="tablist" aria-label="Filter requests">
-        {(['all', 'pending', 'approved', 'in_progress', 'completed', 'rejected', 'rescheduled'] as const).map(f => (
+        {(['all', 'urgent_pending', 'pending', 'urgent_approved', 'approved', 'in_progress', 'completed', 'urgent_rejected', 'rejected', 'rescheduled'] as const).map(f => (
           <button
             key={f}
             id={`filter-${f}`}
@@ -253,11 +316,14 @@ export default function RequestsPage() {
                 }
               }}
               onEdit={setEditingRequest}
+              onFillUrgent={setFillingUrgentReq}
+              onRescheduleUrgent={setReschedulingUrgentReq}
             />
           ))}
         </div>
       )}
 
+      {/* Edit Standard Request Modal */}
       {editingRequest && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -410,6 +476,203 @@ export default function RequestsPage() {
           </div>
         </div>
       )}
+
+      {/* Dedicated Urgent Request Destination & Stops Modal */}
+      {fillingUrgentReq && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)', backdropFilter: 'blur(5px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000, padding: '16px'
+        }} onClick={() => setFillingUrgentReq(null)}>
+          <div style={{
+            background: 'var(--color-surface, #ffffff)',
+            border: '1px solid var(--color-border, #e2e8f0)',
+            borderRadius: '20px', width: '100%', maxWidth: '780px',
+            maxHeight: '90vh', overflowY: 'auto',
+            padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px',
+            boxShadow: 'var(--shadow-lg)'
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#16a34a', fontWeight: 800, fontSize: '0.85rem' }}>
+                <span>⚡</span>
+                <span>{lang === 'th' ? 'คำขอใช้งานด่วนได้รับการอนุมัติแล้ว' : 'Urgent Request Approved'}</span>
+              </div>
+              <h2 style={{ margin: '4px 0 2px 0', fontSize: '1.3rem', fontWeight: 800, color: 'var(--color-text-1)' }}>
+                {t.urgentModalTitle}
+              </h2>
+              <div style={{ fontSize: '0.86rem', color: 'var(--color-text-2)' }}>
+                {lang === 'th'
+                  ? `งาน: "${fillingUrgentReq.title}" | กำหนดเวลา: วันนี้ ${fillingUrgentReq.requestedTime} น.`
+                  : `Job: "${fillingUrgentReq.title}" | Scheduled: Today at ${fillingUrgentReq.requestedTime}`}
+              </div>
+            </div>
+
+            <MapSelector
+              destinations={urgentStops}
+              onDestinationsChange={setUrgentStops}
+              maxStops={5}
+            />
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', borderTop: '1px solid var(--color-border)', paddingTop: '16px' }}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setFillingUrgentReq(null)}
+                disabled={savingUrgentStops}
+                style={{ padding: '10px 20px' }}
+              >
+                {lang === 'th' ? 'ไว้กรอกภายหลัง' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-gradient"
+                disabled={savingUrgentStops}
+                onClick={async () => {
+                  const valid = urgentStops.filter(d => (d.title || d.address).trim());
+                  if (valid.length === 0) {
+                    alert(lang === 'th' ? 'กรุณาระบุจุดหมายหรือสถานที่ปลายทางอย่างน้อย 1 จุด' : 'Please provide at least 1 destination stop.');
+                    return;
+                  }
+
+                  setSavingUrgentStops(true);
+                  try {
+                    const now = Date.now();
+                    const primaryDest = valid[0].title || valid[0].address;
+                    const primaryLatLng = valid[0].latLng || null;
+
+                    const updatePayload: Partial<GeneralRequest> = {
+                      destinations: valid,
+                      destination: primaryDest,
+                      destinationLatLng: primaryLatLng,
+                      status: 'approved', // Officially ready and dispatched
+                      updatedAt: now,
+                    };
+
+                    await updateDoc(doc(db, 'requests', fillingUrgentReq.id), updatePayload);
+
+                    setRequests(prev => prev.map(r => r.id === fillingUrgentReq.id ? {
+                      ...r,
+                      ...updatePayload
+                    } as GeneralRequest : r));
+
+                    setFillingUrgentReq(null);
+                    alert(lang === 'th' ? 'บันทึกเส้นทางเรียบร้อยแล้ว คนขับได้รับงานแล้ว!' : 'Route details saved! The driver is now dispatched.');
+                  } catch (err: any) {
+                    console.error(err);
+                    alert(err.message);
+                  } finally {
+                    setSavingUrgentStops(false);
+                  }
+                }}
+                style={{ padding: '10px 24px', fontSize: '1rem', minWidth: '160px' }}
+              >
+                {savingUrgentStops ? <div className="spinner" style={{ width: 16, height: 16 }} /> : t.confirmUrgentTripBtn}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Urgent Rejected Reschedule to Next Day Modal */}
+      {reschedulingUrgentReq && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0, 0, 0, 0.4)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000, padding: '16px'
+        }} onClick={() => setReschedulingUrgentReq(null)}>
+          <div style={{
+            background: 'var(--color-surface, #ffffff)',
+            border: '1px solid var(--color-border, #e2e8f0)',
+            borderRadius: '16px', width: '100%', maxWidth: '480px',
+            padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px',
+            boxShadow: 'var(--shadow-lg)'
+          }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--color-text-1)' }}>
+              {t.rescheduleToNextDayBtn}
+            </h3>
+            
+            {reschedulingUrgentReq.reviewNote && (
+              <div style={{ padding: '10px 14px', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', fontSize: '0.85rem', color: '#b91c1c' }}>
+                <strong>{t.noteFromRev}</strong> {reschedulingUrgentReq.reviewNote}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-2)' }}>
+                  {lang === 'th' ? 'เลือกวันที่ต้องการจองใหม่ (ล่วงหน้าอย่างน้อย 1 วัน)' : 'Select New Booking Date'}
+                </label>
+                <DateInput
+                  value={rescheduleDate}
+                  onChange={e => setRescheduleDate(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-2)' }}>
+                  {lang === 'th' ? 'เวลา' : 'Time'}
+                </label>
+                <input
+                  type="time"
+                  value={rescheduleTime}
+                  onChange={e => setRescheduleTime(e.target.value)}
+                  style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '0.9rem' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setReschedulingUrgentReq(null)}
+                style={{ flex: 1, padding: '10px' }}
+                disabled={savingReschedule}
+              >
+                {lang === 'th' ? 'ยกเลิก' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={async () => {
+                  if (!rescheduleDate || !rescheduleTime) {
+                    alert(lang === 'th' ? 'กรุณาระบุวันและเวลา' : 'Please specify date and time.');
+                    return;
+                  }
+                  setSavingReschedule(true);
+                  try {
+                    const now = Date.now();
+                    const updatePayload: Partial<GeneralRequest> = {
+                      requestedDate: rescheduleDate,
+                      requestedTime: rescheduleTime,
+                      isUrgent: false,
+                      status: 'pending', // Re-enter standard pending queue
+                      updatedAt: now,
+                    };
+                    await updateDoc(doc(db, 'requests', reschedulingUrgentReq.id), updatePayload);
+                    setRequests(prev => prev.map(r => r.id === reschedulingUrgentReq.id ? {
+                      ...r,
+                      ...updatePayload
+                    } as GeneralRequest : r));
+                    setReschedulingUrgentReq(null);
+                    alert(lang === 'th' ? 'ย้ายวันจองสำเร็จ และส่งคำขอใหม่อีกครั้งแล้ว' : 'Request rescheduled successfully.');
+                  } catch (err: any) {
+                    alert(err.message);
+                  } finally {
+                    setSavingReschedule(false);
+                  }
+                }}
+                style={{ flex: 1, padding: '10px' }}
+                disabled={savingReschedule}
+              >
+                {savingReschedule ? '...' : (lang === 'th' ? 'ยืนยันจองใหม่' : 'Confirm')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -420,7 +683,9 @@ function RequestCard({
   langDict: t, 
   isMasterAdmin, 
   onDelete,
-  onEdit
+  onEdit,
+  onFillUrgent,
+  onRescheduleUrgent,
 }: { 
   request: GeneralRequest; 
   delay: number; 
@@ -428,6 +693,8 @@ function RequestCard({
   isMasterAdmin: boolean; 
   onDelete: (id: string) => Promise<void>;
   onEdit: (req: GeneralRequest) => void;
+  onFillUrgent: (req: GeneralRequest) => void;
+  onRescheduleUrgent: (req: GeneralRequest) => void;
 }) {
   const { lang } = useLang();
   const date = new Date(req.createdAt).toLocaleDateString('en-GB', {
@@ -477,6 +744,97 @@ function RequestCard({
               ? `แก้ไขรายละเอียดเมื่อ ${formatDateTime(req.editedAt, lang)}`
               : `Details updated on ${formatDateTime(req.editedAt, lang)}`}
           </span>
+        </div>
+      )}
+
+      {/* Urgent Pending Banner */}
+      {req.status === 'urgent_pending' && (
+        <div style={{
+          background: 'rgba(245, 158, 11, 0.1)',
+          border: '1.5px solid rgba(245, 158, 11, 0.35)',
+          borderRadius: '10px',
+          padding: '12px 14px',
+          marginTop: '10px',
+          marginBottom: '10px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '6px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 800, color: '#b45309', fontSize: '0.88rem' }}>
+            <span>⏳</span>
+            <span>{t.urgentPendingBanner}</span>
+          </div>
+          {req.urgentReason && (
+            <div style={{ fontSize: '0.82rem', color: '#92400e' }}>
+              <strong>{lang === 'th' ? 'เหตุผลความเร่งด่วน:' : 'Urgency Reason:'}</strong> {req.urgentReason}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Urgent Approved Celebration Banner */}
+      {req.status === 'urgent_approved' && (
+        <div style={{
+          background: 'rgba(22, 163, 74, 0.1)',
+          border: '1.5px solid rgba(22, 163, 74, 0.35)',
+          borderRadius: '10px',
+          padding: '12px 14px',
+          marginTop: '10px',
+          marginBottom: '10px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 800, color: '#15803d', fontSize: '0.88rem' }}>
+            <span>🎉</span>
+            <span>{t.urgentApprovedBanner}</span>
+          </div>
+          <button
+            type="button"
+            className="btn btn-gradient"
+            style={{ width: '100%', padding: '10px', fontSize: '0.92rem', background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)' }}
+            onClick={() => onFillUrgent(req)}
+          >
+            {t.fillUrgentDestBtn}
+          </button>
+        </div>
+      )}
+
+      {/* Urgent Rejected Banner */}
+      {req.status === 'urgent_rejected' && (
+        <div style={{
+          background: 'rgba(239, 68, 68, 0.08)',
+          border: '1.5px solid rgba(239, 68, 68, 0.3)',
+          borderRadius: '10px',
+          padding: '12px 14px',
+          marginTop: '10px',
+          marginBottom: '10px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 800, color: '#b91c1c', fontSize: '0.88rem' }}>
+            <span>❌</span>
+            <span>{t.urgentRejectedBanner}</span>
+          </div>
+          {req.reviewNote && (
+            <div style={{ fontSize: '0.82rem', color: '#991b1b' }}>
+              <strong>{t.noteFromRev}</strong> {req.reviewNote}
+            </div>
+          )}
+          {(req.suggestedDate || req.rescheduledDate) && (
+            <div style={{ fontSize: '0.82rem', color: '#991b1b' }}>
+              <strong>{t.suggestedDate}</strong> {req.suggestedDate || req.rescheduledDate}
+            </div>
+          )}
+          <button
+            type="button"
+            className="btn btn-outline"
+            style={{ width: '100%', padding: '8px 12px', fontSize: '0.88rem', border: '1.5px solid #dc2626', color: '#dc2626' }}
+            onClick={() => onRescheduleUrgent(req)}
+          >
+            {t.rescheduleToNextDayBtn}
+          </button>
         </div>
       )}
 
@@ -560,7 +918,7 @@ function RequestCard({
         </div>
       </div>
 
-      {req.reviewNote && (
+      {req.reviewNote && req.status !== 'urgent_rejected' && (
         <div className={styles.reviewNote}>
           <strong>{t.noteFromRev}</strong> {req.reviewNote}
           {req.rescheduledDate && <> — {t.suggestedDate} <strong>{req.rescheduledDate}</strong></>}

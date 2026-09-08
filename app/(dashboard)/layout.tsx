@@ -16,12 +16,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
 
   useEffect(() => {
-    if (loading) return;
-    if (!firebaseUser) { router.replace('/login'); return; }
-    if (!userProfile) return;
-    if (userProfile.status === 'pending') { router.replace('/pending'); return; }
-    if (userProfile.status === 'rejected') { router.replace('/rejected'); return; }
-    if (userProfile.status === 'suspended') { router.replace('/suspended'); return; }
+    // Fallback if loading hangs for more than 2 seconds
+    const fallback = setTimeout(() => {
+      if (!userProfile || userProfile.status !== 'active') {
+        window.location.href = '/login';
+      }
+    }, 2000);
+
+    if (loading) return () => clearTimeout(fallback);
+
+    clearTimeout(fallback);
+    if (!firebaseUser || !userProfile) {
+      try { router.replace('/login'); } catch {}
+      window.location.href = '/login';
+      return;
+    }
+    if (userProfile.status === 'pending') { window.location.href = '/pending'; return; }
+    if (userProfile.status === 'rejected') { window.location.href = '/rejected'; return; }
+    if (userProfile.status === 'suspended') { window.location.href = '/suspended'; return; }
   }, [loading, firebaseUser, userProfile, router]);
 
   if (loading || !userProfile || userProfile.status !== 'active') {
@@ -29,6 +41,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="page-loader">
         <div className="spinner" />
         <span className="logo-text">Concierge Ride</span>
+        <button
+          type="button"
+          onClick={() => { window.location.href = '/login'; }}
+          style={{
+            marginTop: 16,
+            fontSize: '0.85rem',
+            color: 'var(--color-primary, #0284C7)',
+            background: 'rgba(2, 132, 199, 0.08)',
+            border: '1px solid rgba(2, 132, 199, 0.2)',
+            padding: '6px 14px',
+            borderRadius: '20px',
+            fontWeight: 600,
+            cursor: 'pointer'
+          }}
+        >
+          Sign in
+        </button>
       </div>
     );
   }

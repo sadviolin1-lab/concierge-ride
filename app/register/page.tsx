@@ -86,9 +86,19 @@ const T = {
 
 // ── Departments ───────────────────────────────────────────────────────────────
 const DEPARTMENTS = [
-  'Front Desk', 'Housekeeping', 'F&B', 'Kitchen',
-  'Accounting', 'HR', 'Engineering', 'Security',
-  'Sales & Marketing', 'IT', 'Management',
+  'Accounting',
+  'Administration',
+  'Engineering',
+  'Food & Beverage',
+  'Front Office',
+  'Housekeeping',
+  'Human Resources',
+  'IT',
+  'Kitchen',
+  'Management',
+  'ResCare',
+  'Sales & Marketing',
+  'Security'
 ];
 
 
@@ -131,8 +141,10 @@ export default function RegisterPage() {
     if (!form.nickname.trim())   return t.errNick;
     if (!form.employeeId.trim()) return t.errEmpId;
     if (!form.department)        return t.errDept;
-    const digits = form.phone.replace(/\D/g, '');
-    if (digits.length < 9 || digits.length > 11) return t.errPhone;
+    if (form.phone.trim()) {
+      const digits = form.phone.replace(/\D/g, '');
+      if (digits.length < 9 || digits.length > 11) return t.errPhone;
+    }
     if (!form.purpose)           return t.errPurpose;
     if (!photoFile)              return t.errPhoto;
     if (form.password.length < 6)                return t.errPwLen;
@@ -257,12 +269,12 @@ export default function RegisterPage() {
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="reg-phone">{t.phone} *</label>
+            <label className="form-label" htmlFor="reg-phone">{t.phone}</label>
             <div className={styles.phoneInputWrap}>
               <span className={styles.phonePrefix}>🇹🇭 +66</span>
               <input id="reg-phone" type="tel" className={`form-input ${styles.phoneInput}`}
                 placeholder={t.phonePlaceholder} value={form.phone} onChange={set('phone')}
-                required inputMode="tel" autoComplete="tel" />
+                inputMode="tel" autoComplete="tel" />
             </div>
             <p className={styles.fieldHint}>{t.phoneHint}</p>
           </div>

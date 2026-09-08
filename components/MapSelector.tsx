@@ -1,42 +1,59 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { Destination } from '@/lib/types';
+import type { Destination, LatLng } from '@/lib/types';
 import { useLang } from '@/lib/use-lang';
+import { useAuth } from '@/lib/auth-context';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { restrictToVerticalAxis, restrictToWindowEdges } from '@dnd-kit/modifiers';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import styles from './map-selector.module.css';
 
-// ─── Phuket bounding box ───────────────────────────────────
-// Covers: Phuket only
-const SEARCH_VIEWBOX = '98.2,8.25,98.45,7.75'; // west,north,east,south (lon,lat format for Nominatim)
-const SEARCH_BOUNDED = '1'; // strictly within viewbox
+export interface FavoritePlace {
+  id: string;
+  name: string;
+  address: string;
+  latLng: LatLng;
+  icon?: string;
+}
+
+// Default initial suggestions for Phuket if user has no saved favorites yet
+const DEFAULT_PHUKET_PLACES: FavoritePlace[] = [
+  { id: 'fav-hkt', name: '✈️ สนามบินภูเก็ต (HKT)', address: 'Mai Khao, Thalang District, Phuket 83110', latLng: { lat: 8.1132, lng: 98.3169 }, icon: '✈️' },
+  { id: 'fav-central', name: '🛍️ เซ็นทรัล ภูเก็ต', address: 'Vichitsongkram Rd, Wichit, Mueang Phuket 83000', latLng: { lat: 7.8916, lng: 98.3678 }, icon: '🛍️' },
+  { id: 'fav-bkk-hosp', name: '🏥 รพ.กรุงเทพ ภูเก็ต', address: 'Hongyok Utis Rd, Sam Kong, Phuket 83000', latLng: { lat: 7.9042, lng: 98.3756 }, icon: '🏥' },
+  { id: 'fav-gov', name: '🏢 ศาลากลางภูเก็ต', address: 'Narison Rd, Talat Yai, Phuket 83000', latLng: { lat: 7.8845, lng: 98.3905 }, icon: '🏢' },
+  { id: 'fav-bank', name: '🏦 ธนาคารกสิกรไทย (ภูเก็ต)', address: 'Phangnga Rd, Talat Yai, Phuket 83000', latLng: { lat: 7.8839, lng: 98.3888 }, icon: '🏦' },
+];
 
 function SortableStopItem({ id, children }: { id: string; children: React.ReactNode }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    zIndex: isDragging ? 1 : 0,
+    zIndex: isDragging ? 10 : 0,
     position: isDragging ? ('relative' as const) : ('static' as const),
+    opacity: isDragging ? 0.8 : 1,
+    width: '100%',
+    maxWidth: '100%',
+    boxSizing: 'border-box' as const,
   };
   return (
     <div ref={setNodeRef} style={style}>
-      <div style={{ display: 'flex', gap: '8px' }}>
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
         <div
           {...attributes}
           {...listeners}
-          style={{ cursor: 'grab', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 8px', color: 'var(--color-text-2)' }}
-          title="Drag to reorder"
+          className={styles.dragHandle}
+          title="Drag to reorder stop"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
             <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
           </svg>
         </div>
-        <div style={{ flex: 1 }}>{children}</div>
+        <div style={{ flex: 1, minWidth: 0, maxWidth: '100%', boxSizing: 'border-box' }}>{children}</div>
       </div>
     </div>
   );
@@ -44,34 +61,56 @@ function SortableStopItem({ id, children }: { id: string; children: React.ReactN
 
 const LANG = {
   en: {
+    favoritesTitle: '⭐ Frequent & Favorite Places',
+    favoritesHint: 'Click to auto-fill into stop. Use ⭐ on any stop to pin new favorites.',
     placeName: 'Place name (for driver)',
     placeNameHint: 'e.g. Central Festival, Phuket Airport',
-    searchAddress: 'Search address / coordinates',
+    searchAddress: 'Search location / Google Places',
     searchHint: 'Type to search in Phuket area…',
-    coordsLabel: 'Coordinates',
-    descPlaceholder: 'Task description (e.g. Deposit checks)',
-    hasPassengers: 'Has passengers?',
+    descPlaceholder: '📝 Driver task (e.g. deliver invoice, pickup box)',
+    hasPassengers: 'Passengers?',
     count: 'Count',
     addStop: '+ Add Stop',
-    searching: 'Searching…',
-    noResults: 'No results found in Phuket area',
-    pinned: 'Pinned from map',
+    roundTrip: '🔄 Add Return Trip (Round Trip)',
+    searching: 'Searching Google Places…',
+    noResults: 'No places found in Phuket area',
     clearCoords: 'Clear location',
+    saveFav: 'Save to Favorites',
+    savedFav: 'Saved to favorites!',
+    favSavedStatus: 'Saved',
+    saveFavPrompt: 'Please search or select a location first',
+    removeStop: 'Remove stop',
+    stopLabel: 'Stop',
+    originLabel: 'Origin',
+    estDistance: 'Est. Distance',
+    estDuration: 'Est. Drive Time',
+    totalStops: 'Total Stops',
   },
   th: {
+    favoritesTitle: '⭐ สถานที่ใช้บ่อย & รายการโปรด',
+    favoritesHint: 'กดเพื่อเลือกจุดหมายทันที · กด ⭐ ที่จุดแวะเพื่อบันทึกสถานที่โปรดของคุณ',
     placeName: 'ชื่อสถานที่ (สำหรับคนขับ)',
     placeNameHint: 'เช่น เซ็นทรัล ภูเก็ต, สนามบินภูเก็ต',
-    searchAddress: 'ค้นหาที่อยู่ / พิกัด',
-    searchHint: 'พิมพ์เพื่อค้นหาในพื้นที่ภูเก็ต…',
-    coordsLabel: 'พิกัด',
-    descPlaceholder: 'รายละเอียดงาน (เช่น ฝากเช็ค)',
+    searchAddress: 'ค้นหาสถานที่ / Google Places',
+    searchHint: 'พิมพ์ค้นหาสถานที่ในภูเก็ต…',
+    descPlaceholder: '📝 รายละเอียดงานที่จุดนี้ (เช่น ฝากเช็ค, ยื่นเอกสารช่อง 3)',
     hasPassengers: 'มีผู้โดยสาร?',
-    count: 'จำนวนคน',
+    count: 'จำนวน',
     addStop: '+ เพิ่มจุดแวะ',
-    searching: 'กำลังค้นหา…',
+    roundTrip: '🔄 เพิ่มขากลับ (ไป-กลับ)',
+    searching: 'กำลังค้นหา Google Places…',
     noResults: 'ไม่พบสถานที่ในพื้นที่ภูเก็ต',
-    pinned: 'ปักหมุดจากแผนที่',
-    clearCoords: 'ล้างตำแหน่ง',
+    clearCoords: 'ล้างพิกัด',
+    saveFav: 'บันทึกโปรด',
+    savedFav: 'บันทึกแล้ว!',
+    favSavedStatus: 'บันทึกแล้ว',
+    saveFavPrompt: 'กรุณาค้นหาสถานที่หรือปักหมุดบนแผนที่ก่อนบันทึก',
+    removeStop: 'ลบจุดแวะ',
+    stopLabel: 'จุดที่',
+    originLabel: 'ต้นทาง',
+    estDistance: 'ระยะทางประมาณ',
+    estDuration: 'เวลาเดินทางประมาณ',
+    totalStops: 'จำนวนจุดแวะ',
   },
 };
 
@@ -83,108 +122,244 @@ interface MapSelectorProps {
   maxStops?: number;
 }
 
-// ─── Leaflet Map ───────────────────────────────────────────────────────────────
-function LeafletMap({
+// ─── Google Maps Script Loader ─────────────────────────────────────────────
+let googleMapsLoadingPromise: Promise<void> | null = null;
+
+function loadGoogleMapsScript(): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve();
+  if ((window as any).google?.maps) return Promise.resolve();
+
+  if (!googleMapsLoadingPromise) {
+    googleMapsLoadingPromise = new Promise((resolve, reject) => {
+      const existingScript = document.getElementById('google-maps-script');
+      if (existingScript) {
+        existingScript.addEventListener('load', () => resolve());
+        existingScript.addEventListener('error', (e) => reject(e));
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.id = 'google-maps-script';
+      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => resolve();
+      script.onerror = (e) => reject(e);
+      document.head.appendChild(script);
+    });
+  }
+
+  return googleMapsLoadingPromise;
+}
+
+// ─── Google Maps Component ──────────────────────────────────────────────────
+function GoogleMapComponent({
   destinations,
   onMarkerDragEnd,
+  onRouteStatsChange,
 }: {
   destinations: Destination[];
   onMarkerDragEnd: (index: number, lat: number, lng: number) => void;
+  onRouteStatsChange?: (stats: { distanceText: string; durationText: string; totalMeters: number; totalSeconds: number } | null) => void;
 }) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
-  const [leafletLoaded, setLeafletLoaded] = useState(false);
+  const directionsRendererRef = useRef<any>(null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    if (!document.getElementById('leaflet-css')) {
-      const link = document.createElement('link');
-      link.id = 'leaflet-css';
-      link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      document.head.appendChild(link);
-    }
-    if ((window as any).L) { setLeafletLoaded(true); return; }
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    script.async = true;
-    script.onload = () => setLeafletLoaded(true);
-    document.head.appendChild(script);
+    loadGoogleMapsScript()
+      .then(() => setLoaded(true))
+      .catch((err) => console.error('Failed to load Google Maps script', err));
   }, []);
 
+  // Initialize Map
   useEffect(() => {
-    if (!leafletLoaded || !mapRef.current || mapInstance.current) return;
-    const L = (window as any).L;
-    mapInstance.current = L.map(mapRef.current, { center: [7.8804, 98.3923], zoom: 10, zoomControl: true });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      maxZoom: 19,
-    }).addTo(mapInstance.current);
-  }, [leafletLoaded]);
+    if (!loaded || !mapRef.current || mapInstance.current) return;
+    
+    const google = (window as any).google;
+    const map = new google.maps.Map(mapRef.current, {
+      center: { lat: 7.8804, lng: 98.3923 },
+      zoom: 11,
+      mapTypeControl: true,
+      streetViewControl: false,
+      fullscreenControl: true,
+      zoomControl: true,
+    });
+    mapInstance.current = map;
 
-  const onMapClick = useCallback((e: any) => {
-    // Find first destination without coords, or default to last
-    const targetIndex = destinations.findIndex(d => !d.latLng);
-    const indexToUpdate = targetIndex !== -1 ? targetIndex : destinations.length - 1;
-    if (indexToUpdate >= 0) {
-      onMarkerDragEnd(indexToUpdate, e.latlng.lat, e.latlng.lng);
-    }
-  }, [destinations, onMarkerDragEnd]);
+    const directionsRenderer = new google.maps.DirectionsRenderer({
+      map,
+      suppressMarkers: true,
+      polylineOptions: {
+        strokeColor: '#0EA5E9',
+        strokeOpacity: 0.85,
+        strokeWeight: 5,
+      },
+    });
+    directionsRendererRef.current = directionsRenderer;
+  }, [loaded]);
 
+  // Click handler to pin location
   useEffect(() => {
-    if (!mapInstance.current || !(window as any).L) return;
-    mapInstance.current.off('click');
-    mapInstance.current.on('click', onMapClick);
-  }, [onMapClick]);
+    if (!mapInstance.current) return;
 
-  useEffect(() => {
-    if (!mapInstance.current || !(window as any).L) return;
-    const L = (window as any).L;
-    markersRef.current.forEach(m => m.remove());
-    markersRef.current = [];
-    const bounds: [number, number][] = [];
-
-    destinations.forEach((dest, index) => {
-      if (!dest.latLng) return;
-      const color = DESTINATION_COLORS[index % DESTINATION_COLORS.length];
-      const icon = L.divIcon({
-        className: '',
-        html: `<div style="width:32px;height:32px;border-radius:50%;background:${color};border:3px solid white;box-shadow:0 2px 10px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:13px;font-family:sans-serif;">${index + 1}</div>`,
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
-      });
-      const marker = L.marker([dest.latLng!.lat, dest.latLng!.lng], { draggable: true, icon }).addTo(mapInstance.current);
-      marker.on('dragend', () => {
-        const pos = marker.getLatLng();
-        onMarkerDragEnd(index, pos.lat, pos.lng);
-      });
-
-      // Tooltip with place name
-      if (dest.title) {
-        marker.bindTooltip(`<b>${dest.title}</b>`, { permanent: false, direction: 'top', offset: [0, -18] });
+    const google = (window as any).google;
+    const clickListener = mapInstance.current.addListener('click', (e: any) => {
+      if (!e.latLng) return;
+      const lat = e.latLng.lat();
+      const lng = e.latLng.lng();
+      
+      const targetIndex = destinations.findIndex(d => !d.latLng);
+      const indexToUpdate = targetIndex !== -1 ? targetIndex : destinations.length - 1;
+      if (indexToUpdate >= 0) {
+        onMarkerDragEnd(indexToUpdate, lat, lng);
       }
-
-      markersRef.current.push(marker);
-      bounds.push([dest.latLng!.lat, dest.latLng!.lng]);
     });
 
-    if (bounds.length > 0) {
-      try { mapInstance.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 }); }
-      catch { /* ignore */ }
+    return () => {
+      google.maps.event.removeListener(clickListener);
+    };
+  }, [destinations, onMarkerDragEnd]);
+
+  // Sync Markers and Route Path
+  useEffect(() => {
+    if (!mapInstance.current || !loaded) return;
+
+    const google = (window as any).google;
+
+    // Clear old markers
+    markersRef.current.forEach(m => m.setMap(null));
+    markersRef.current = [];
+
+    const bounds = new google.maps.LatLngBounds();
+    const validDests = destinations.filter(d => d.latLng);
+
+    // Create markers
+    destinations.forEach((dest, index) => {
+      if (!dest.latLng) return;
+      
+      const color = DESTINATION_COLORS[index % DESTINATION_COLORS.length];
+      const marker = new google.maps.Marker({
+        position: { lat: dest.latLng.lat, lng: dest.latLng.lng },
+        map: mapInstance.current,
+        draggable: true,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          fillColor: color,
+          fillOpacity: 1,
+          strokeColor: '#FFFFFF',
+          strokeWeight: 2.5,
+          scale: 14,
+          anchor: new google.maps.Point(0, 0),
+          labelOrigin: new google.maps.Point(0, 0),
+        },
+        label: {
+          text: String(index + 1),
+          color: '#FFFFFF',
+          fontWeight: 'bold',
+          fontSize: '13px',
+        },
+        title: dest.title || dest.address || '',
+      });
+
+      marker.addListener('dragend', () => {
+        const pos = marker.getPosition();
+        if (pos) {
+          onMarkerDragEnd(index, pos.lat(), pos.lng());
+        }
+      });
+
+      markersRef.current.push(marker);
+      bounds.extend(marker.getPosition()!);
+    });
+
+    // Handle polyline/routing route
+    if (directionsRendererRef.current) {
+      if (validDests.length >= 2) {
+        directionsRendererRef.current.setMap(mapInstance.current);
+        const origin = validDests[0].latLng!;
+        const destination = validDests[validDests.length - 1].latLng!;
+        const waypoints = validDests.slice(1, -1).map(d => ({
+          location: new google.maps.LatLng(d.latLng!.lat, d.latLng!.lng),
+          stopover: true,
+        }));
+
+        const directionsService = new google.maps.DirectionsService();
+        directionsService.route(
+          {
+            origin: new google.maps.LatLng(origin.lat, origin.lng),
+            destination: new google.maps.LatLng(destination.lat, destination.lng),
+            waypoints,
+            travelMode: google.maps.TravelMode.DRIVING,
+          },
+          (response: any, status: any) => {
+            if (status === google.maps.DirectionsStatus.OK && response && directionsRendererRef.current) {
+              directionsRendererRef.current.setDirections(response);
+              
+              // Calculate total distance & duration
+              if (response.routes && response.routes[0] && response.routes[0].legs) {
+                let totalMeters = 0;
+                let totalSeconds = 0;
+                response.routes[0].legs.forEach((leg: any) => {
+                  totalMeters += leg.distance?.value || 0;
+                  totalSeconds += leg.duration?.value || 0;
+                });
+                const km = (totalMeters / 1000).toFixed(1);
+                const mins = Math.ceil(totalSeconds / 60);
+                const durationText = mins > 60 ? `${Math.floor(mins / 60)} ชม. ${mins % 60} น.` : `${mins} นาที`;
+                if (onRouteStatsChange) {
+                  onRouteStatsChange({
+                    distanceText: `${km} กม.`,
+                    durationText,
+                    totalMeters,
+                    totalSeconds,
+                  });
+                }
+              }
+            } else {
+              directionsRendererRef.current?.setMap(null);
+              if (onRouteStatsChange) onRouteStatsChange(null);
+            }
+          }
+        );
+      } else {
+        // Clear route
+        directionsRendererRef.current.setMap(null);
+        if (onRouteStatsChange) onRouteStatsChange(null);
+        
+        if (validDests.length === 1) {
+          mapInstance.current.setCenter(new google.maps.LatLng(validDests[0].latLng!.lat, validDests[0].latLng!.lng));
+          mapInstance.current.setZoom(14);
+        }
+      }
     }
-  }, [destinations, leafletLoaded, onMarkerDragEnd]);
+
+    // Fit bounds to show all markers
+    if (validDests.length > 0 && validDests.length < 2) {
+      mapInstance.current.fitBounds(bounds);
+      const listener = google.maps.event.addListener(mapInstance.current, 'bounds_changed', () => {
+        if (mapInstance.current && mapInstance.current.getZoom()! > 15) {
+          mapInstance.current.setZoom(15);
+        }
+        google.maps.event.removeListener(listener);
+      });
+    }
+  }, [destinations, loaded, onMarkerDragEnd, onRouteStatsChange]);
 
   return (
     <div>
       <div ref={mapRef} style={{ width: '100%', height: '320px', borderRadius: 12, overflow: 'hidden', border: '1px solid var(--color-border)' }} />
       <p style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--color-text-3)', textAlign: 'center' }}>
-        💡 ลากหมุด หรือ คลิกที่แผนที่ เพื่อปรับตำแหน่ง — ชื่อสถานที่จะยังคงเดิม
+        💡 ลากหมุด หรือ คลิกบนแผนที่ เพื่อปรับตำแหน่ง · พิกัดจะอัพเดตอัตโนมัติ
       </p>
     </div>
   );
 }
 
-// ─── Nominatim Search (Phuket-area restricted) ────────────────────────────────
+// ─── Google Places Address Search ───────────────────────────────────────────
 function AddressSearch({
   placeholder,
   hint,
@@ -194,7 +369,7 @@ function AddressSearch({
 }: {
   placeholder: string;
   hint: string;
-  onSelectResult: (display: string, lat: number, lng: number) => void;
+  onSelectResult: (display: string, lat: number, lng: number, placeName?: string) => void;
   noResultsText: string;
   searchingText: string;
 }) {
@@ -204,30 +379,44 @@ function AddressSearch({
   const [showDropdown, setShowDropdown] = useState(false);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const [mapsLoaded, setMapsLoaded] = useState(false);
+
+  useEffect(() => {
+    loadGoogleMapsScript()
+      .then(() => setMapsLoaded(true))
+      .catch((err) => console.error('Failed to load Google Maps script for AddressSearch', err));
+  }, []);
 
   const search = useCallback((q: string) => {
     if (debounce.current) clearTimeout(debounce.current);
-    if (!q || q.length < 2) { setResults([]); setShowDropdown(false); return; }
-    debounce.current = setTimeout(async () => {
+    if (!q || q.length < 2 || !mapsLoaded) { setResults([]); setShowDropdown(false); return; }
+
+    debounce.current = setTimeout(() => {
       setLoading(true);
-      try {
-        // Search biased/bounded to Phuket area (viewbox: west,north,east,south)
-        const url = new URL('https://nominatim.openstreetmap.org/search');
-        url.searchParams.set('q', q);
-        url.searchParams.set('format', 'json');
-        url.searchParams.set('limit', '6');
-        url.searchParams.set('countrycodes', 'th');
-        url.searchParams.set('viewbox', SEARCH_VIEWBOX);
-        url.searchParams.set('bounded', SEARCH_BOUNDED);
-        url.searchParams.set('addressdetails', '1');
-        const res = await fetch(url.toString(), { headers: { 'Accept-Language': 'th,en' } });
-        const data = await res.json();
-        setResults(data);
-        setShowDropdown(true);
-      } catch { setResults([]); }
-      finally { setLoading(false); }
-    }, 450);
-  }, []);
+      const google = (window as any).google;
+      const service = new google.maps.places.AutocompleteService();
+      
+      const phuketBounds = new google.maps.LatLngBounds(
+        new google.maps.LatLng(7.4, 98.1),
+        new google.maps.LatLng(8.3, 98.6)
+      );
+
+      service.getPlacePredictions({
+        input: q,
+        componentRestrictions: { country: 'th' },
+        locationBias: phuketBounds,
+      }, (predictions: any, status: any) => {
+        setLoading(false);
+        if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
+          setResults(predictions);
+          setShowDropdown(true);
+        } else {
+          setResults([]);
+          setShowDropdown(q.length >= 2);
+        }
+      });
+    }, 400);
+  }, [mapsLoaded]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setQuery(e.target.value);
@@ -245,15 +434,29 @@ function AddressSearch({
   }, []);
 
   const handleSelect = (r: any) => {
-    onSelectResult(r.display_name, parseFloat(r.lat), parseFloat(r.lon));
+    const google = (window as any).google;
+    const dummyDiv = document.createElement('div');
+    const placesService = new google.maps.places.PlacesService(dummyDiv);
+    placesService.getDetails({
+      placeId: r.place_id,
+      fields: ['name', 'formatted_address', 'geometry'],
+    }, (place: any, status: any) => {
+      if (status === google.maps.places.PlacesServiceStatus.OK && place && place.geometry?.location) {
+        const lat = place.geometry.location.lat();
+        const lng = place.geometry.location.lng();
+        const placeName = place.name || r.structured_formatting?.main_text || r.description.split(',')[0];
+        const address = place.formatted_address || r.description;
+        onSelectResult(address, lat, lng, placeName);
+      }
+    });
     setQuery('');
     setResults([]);
     setShowDropdown(false);
   };
 
   return (
-    <div ref={wrapperRef} style={{ position: 'relative' }}>
-      <div style={{ position: 'relative' }}>
+    <div ref={wrapperRef} style={{ position: 'relative', width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
+      <div style={{ position: 'relative', width: '100%' }}>
         <input
           type="text"
           placeholder={placeholder}
@@ -261,7 +464,7 @@ function AddressSearch({
           value={query}
           onChange={handleChange}
           onFocus={() => results.length > 0 && setShowDropdown(true)}
-          style={{ width: '100%', paddingRight: 36, fontSize: '0.88rem', background: 'rgba(255,255,255,0.04)' }}
+          style={{ width: '100%', boxSizing: 'border-box', paddingRight: 36, fontSize: '0.88rem', background: 'rgba(255,255,255,0.04)' }}
           autoComplete="off"
         />
         {loading && (
@@ -272,7 +475,6 @@ function AddressSearch({
           </span>
         )}
       </div>
-      <p style={{ margin: '3px 0 0', fontSize: 11, color: 'var(--color-text-3)' }}>{hint}</p>
 
       {showDropdown && (
         <div style={{
@@ -298,12 +500,11 @@ function AddressSearch({
                 onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-2)')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'none')}
               >
-                {/* Show short name + province */}
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-1)' }}>
-                  {r.address?.tourism || r.address?.amenity || r.address?.building || r.address?.road || r.name || r.display_name.split(',')[0]}
+                  📍 {r.structured_formatting?.main_text || r.description.split(',')[0]}
                 </span>
                 <span style={{ fontSize: 11, color: 'var(--color-text-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
-                  {r.display_name}
+                  {r.description}
                 </span>
               </button>
             ))
@@ -316,8 +517,104 @@ function AddressSearch({
 
 // ─── Main MapSelector ──────────────────────────────────────────────────────────
 export default function MapSelector({ destinations, onDestinationsChange, maxStops = 5 }: MapSelectorProps) {
+  const { userProfile } = useAuth();
   const { lang } = useLang();
   const t = LANG[lang] || LANG.en;
+
+  // Favorites state per user in localStorage
+  const [favorites, setFavorites] = useState<FavoritePlace[]>([]);
+  const [savedFeedback, setSavedFeedback] = useState<string | null>(null);
+  const [routeStats, setRouteStats] = useState<{ distanceText: string; durationText: string; totalMeters: number; totalSeconds: number } | null>(null);
+
+  const storageKey = `concierge_user_fav_places_${userProfile?.uid || 'default'}`;
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        setFavorites(JSON.parse(stored));
+      } else {
+        setFavorites(DEFAULT_PHUKET_PLACES);
+        localStorage.setItem(storageKey, JSON.stringify(DEFAULT_PHUKET_PLACES));
+      }
+    } catch {
+      setFavorites(DEFAULT_PHUKET_PLACES);
+    }
+  }, [storageKey]);
+
+  const saveFavoritesToStorage = (list: FavoritePlace[]) => {
+    setFavorites(list);
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(list));
+    } catch (e) {
+      console.error('Failed to save favorites', e);
+    }
+  };
+
+  const checkIsFavorite = (dest: Destination) => {
+    if (!dest.title && !dest.address) return false;
+    const rawName = (dest.title || dest.address.split(',')[0]).trim();
+    const cleanName = rawName.replace(/^[\p{Emoji}\s]+/u, '').trim() || rawName;
+    return favorites.some(f => f.name.toLowerCase().trim() === cleanName.toLowerCase());
+  };
+
+  const handleToggleFavorite = (dest: Destination) => {
+    if (!dest.title && !dest.address) return;
+    if (!dest.latLng) return;
+
+    const rawName = (dest.title || dest.address.split(',')[0]).trim();
+    const cleanName = rawName.replace(/^[\p{Emoji}\s]+/u, '').trim() || rawName;
+    const existingIndex = favorites.findIndex(f => f.name.toLowerCase().trim() === cleanName.toLowerCase());
+
+    if (existingIndex >= 0) {
+      const updated = favorites.filter((_, idx) => idx !== existingIndex);
+      saveFavoritesToStorage(updated);
+    } else {
+      const newFav: FavoritePlace = {
+        id: `fav-${Date.now()}`,
+        name: cleanName,
+        address: dest.address,
+        latLng: dest.latLng,
+        icon: '⭐',
+      };
+      const updated = [newFav, ...favorites];
+      saveFavoritesToStorage(updated);
+      setSavedFeedback(t.savedFav);
+      setTimeout(() => setSavedFeedback(null), 2500);
+    }
+  };
+
+  const handleDeleteFavorite = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    const updated = favorites.filter(f => f.id !== id);
+    saveFavoritesToStorage(updated);
+  };
+
+  const handleApplyFavorite = (fav: FavoritePlace) => {
+    // Find first empty stop, or add new stop
+    const emptyIndex = destinations.findIndex(d => !d.title && !d.latLng && !d.address);
+    if (emptyIndex !== -1) {
+      const newDests = [...destinations];
+      newDests[emptyIndex] = {
+        ...newDests[emptyIndex],
+        title: fav.name.replace(/^[\p{Emoji}\s]+/u, ''),
+        address: fav.address,
+        latLng: fav.latLng,
+      };
+      onDestinationsChange(newDests);
+    } else if (destinations.length < maxStops) {
+      const newId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+      onDestinationsChange([
+        ...destinations,
+        {
+          id: newId,
+          title: fav.name.replace(/^[\p{Emoji}\s]+/u, ''),
+          address: fav.address,
+          latLng: fav.latLng,
+        }
+      ]);
+    }
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -335,21 +632,25 @@ export default function MapSelector({ destinations, onDestinationsChange, maxSto
     }
   };
 
-  // When marker dragged: keep title, update latLng only (reverse-geocode for address field)
+  // Reverse geocoding on drag
   const handleMarkerDragEnd = useCallback((index: number, lat: number, lng: number) => {
-    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, {
-      headers: { 'Accept-Language': 'th,en' },
-    })
-      .then(r => r.json())
-      .then(data => {
-        const newDests = [...destinations];
-        newDests[index] = {
-          ...newDests[index],
-          latLng: { lat, lng },
-          address: data.display_name || `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
-          // title remains unchanged — driver name is preserved
-        };
-        onDestinationsChange(newDests);
+    loadGoogleMapsScript()
+      .then(() => {
+        const google = (window as any).google;
+        const geocoder = new google.maps.Geocoder();
+        geocoder.geocode({ location: { lat, lng } }, (results: any, status: any) => {
+          const newDests = [...destinations];
+          let address = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+          if (status === google.maps.GeocoderStatus.OK && results && results[0]) {
+            address = results[0].formatted_address;
+          }
+          newDests[index] = {
+            ...newDests[index],
+            latLng: { lat, lng },
+            address: address,
+          };
+          onDestinationsChange(newDests);
+        });
       })
       .catch(() => {
         const newDests = [...destinations];
@@ -358,15 +659,14 @@ export default function MapSelector({ destinations, onDestinationsChange, maxSto
       });
   }, [destinations, onDestinationsChange]);
 
-  // When place selected from search: autofill address+coords, keep title (or suggest)
-  const handleSelectAddress = useCallback((index: number, display: string, lat: number, lng: number) => {
+  // When place selected from search: autofill address+coords and title
+  const handleSelectAddress = useCallback((index: number, display: string, lat: number, lng: number, placeName?: string) => {
     const newDests = [...destinations];
-    const shortName = display.split(',')[0].trim();
+    const shortName = placeName || display.split(',')[0].trim();
     newDests[index] = {
       ...newDests[index],
       address: display,
       latLng: { lat, lng },
-      // Auto-suggest title only if still empty
       title: newDests[index].title && newDests[index].title!.trim() ? newDests[index].title : shortName,
     };
     onDestinationsChange(newDests);
@@ -385,12 +685,87 @@ export default function MapSelector({ destinations, onDestinationsChange, maxSto
     }
   };
 
+  const addRoundTrip = () => {
+    if (destinations.length >= maxStops) return;
+    const firstStop = destinations[0];
+    if (!firstStop || (!firstStop.title && !firstStop.address)) return;
+
+    const newId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+    const returnTitle = firstStop.title ? `${firstStop.title} (${lang === 'th' ? 'ขากลับ' : 'Return'})` : firstStop.address;
+    onDestinationsChange([
+      ...destinations,
+      {
+        id: newId,
+        title: returnTitle,
+        address: firstStop.address,
+        latLng: firstStop.latLng,
+        description: lang === 'th' ? 'กลับมาจุดเริ่มต้น' : 'Return to starting origin',
+      }
+    ]);
+  };
+
   const removeDestination = (index: number) => {
     onDestinationsChange(destinations.filter((_, i) => i !== index));
   };
 
   return (
     <div className={styles.container}>
+      {/* ── Personal Favorites / Frequent Places Bar ── */}
+      <div className={styles.favoritesSection}>
+        <div className={styles.favoritesHeader}>
+          <div className={styles.favoritesTitle}>
+            {t.favoritesTitle}
+          </div>
+          {savedFeedback && (
+            <span style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600, animation: 'fadeIn 0.2s ease' }}>
+              ✓ {savedFeedback}
+            </span>
+          )}
+        </div>
+        <p className={styles.favoritesSubtitle}>{t.favoritesHint}</p>
+        <div className={styles.favoritesList}>
+          {favorites.map((fav) => (
+            <button
+              key={fav.id}
+              type="button"
+              className={styles.favChip}
+              onClick={() => handleApplyFavorite(fav)}
+              title={fav.address}
+            >
+              <span>{fav.name}</span>
+              <span
+                className={styles.favChipDelete}
+                onClick={(e) => handleDeleteFavorite(e, fav.id)}
+                title="Remove from favorites"
+              >
+                ✕
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Route Distance & Duration Banner ── */}
+      {routeStats && (
+        <div className={styles.routeStatsBanner}>
+          <div className={styles.routeStatsLeft}>
+            <div className={styles.statItem}>
+              <span>🚗</span>
+              <span className={styles.statLabel}>{t.estDistance}:</span>
+              <span className={styles.statValue}>{routeStats.distanceText}</span>
+            </div>
+            <div className={styles.statItem}>
+              <span>⏱️</span>
+              <span className={styles.statLabel}>{t.estDuration}:</span>
+              <span className={styles.statValue}>{routeStats.durationText}</span>
+            </div>
+          </div>
+          <div className={styles.statItem} style={{ fontSize: '0.78rem', color: 'var(--color-text-3)' }}>
+            <span>📍 {destinations.filter(d => d.latLng).length} {t.totalStops}</span>
+          </div>
+        </div>
+      )}
+
       {/* ── Stop List ── */}
       <div className={styles.stopsList}>
         <DndContext
@@ -407,127 +782,191 @@ export default function MapSelector({ destinations, onDestinationsChange, maxSto
               const id = dest.id || `stop-${index}`;
               const color = DESTINATION_COLORS[index % DESTINATION_COLORS.length];
               const hasCoords = !!dest.latLng;
+              const isFav = checkIsFavorite(dest);
 
               return (
                 <SortableStopItem key={id} id={id}>
-                  <div className={styles.stopRow}>
-                    {/* Number badge */}
-                    <div className={styles.stopIcon} style={{ backgroundColor: color }}>
-                      {String(index + 1)}
-                    </div>
-
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
-
-                      {/* ① Place Name — Primary field for driver */}
-                      <div>
-                        <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4, display: 'block' }}>
-                          📍 {t.placeName} <span style={{ color: 'var(--color-error)' }}>*</span>
-                        </label>
-                        <input
-                          type="text"
-                          placeholder={t.placeNameHint}
-                          className="form-input"
-                          value={dest.title || ''}
-                          onChange={e => updateField(index, 'title', e.target.value)}
-                          required
-                          style={{ fontWeight: 600, fontSize: '0.95rem' }}
-                        />
+                  <div className={styles.stopCard}>
+                    {/* Top Action Bar: Stop # Badge + Origin indicator + Save Fav Pill + Delete Stop */}
+                    <div className={styles.stopTopBar}>
+                      <div className={styles.stopTopLeft}>
+                        <div className={styles.stopBadge} style={{ backgroundColor: color }}>
+                          {index + 1}
+                        </div>
+                        <span className={styles.stopNumberLabel}>
+                          {t.stopLabel} {index + 1}
+                          {index === 0 && (
+                            <span className={styles.stopOriginTag}>{t.originLabel}</span>
+                          )}
+                        </span>
                       </div>
 
-                      {/* ② Address search → fills coordinates */}
-                      <div style={{ background: 'var(--color-bg-2)', borderRadius: 10, padding: '10px 12px', border: '1px solid var(--color-border)' }}>
-                        <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-3)', marginBottom: 6, display: 'block' }}>
-                          🔍 {t.searchAddress}
-                        </label>
-                        <AddressSearch
-                          placeholder={t.searchHint}
-                          hint=""
-                          onSelectResult={(display, lat, lng) => handleSelectAddress(index, display, lat, lng)}
-                          noResultsText={t.noResults}
-                          searchingText={t.searching}
-                        />
+                      <div className={styles.stopHeaderActions}>
+                        {/* Bookmark / Save to favorites button */}
+                        <button
+                          type="button"
+                          className={`${styles.actionPillBtn} ${isFav ? styles.savedFavPillBtn : styles.saveFavPillBtn}`}
+                          onClick={() => {
+                            if (!hasCoords && !dest.title && !dest.address) {
+                              alert(t.saveFavPrompt);
+                              return;
+                            }
+                            handleToggleFavorite(dest);
+                          }}
+                          title={isFav ? (lang === 'th' ? 'ลบออกจากรายการโปรด' : 'Remove from favorites') : t.saveFav}
+                        >
+                          <span className={styles.favStarIcon}>{isFav ? '★' : '☆'}</span>
+                          <span className={styles.favBtnText}>
+                            {isFav ? t.favSavedStatus : t.saveFav}
+                          </span>
+                        </button>
 
-                        {/* Coordinates display */}
-                        {hasCoords ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-                            <div style={{
-                              flex: 1, display: 'flex', alignItems: 'center', gap: 6,
-                              background: 'rgba(2, 132, 199, 0.08)', border: '1px solid rgba(2,132,199,0.2)',
-                              borderRadius: 8, padding: '6px 10px', fontSize: 12,
-                            }}>
-                              <span style={{ color: color, fontSize: 14 }}>📌</span>
-                              <span style={{ color: 'var(--color-text-2)', fontFamily: 'monospace' }}>
-                                {dest.latLng!.lat.toFixed(5)}, {dest.latLng!.lng.toFixed(5)}
-                              </span>
-                              <span style={{ color: 'var(--color-text-3)', fontSize: 10, marginLeft: 4, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                — {dest.address}
-                              </span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newDests = [...destinations];
-                                newDests[index] = { ...newDests[index], latLng: null, address: '' };
-                                onDestinationsChange(newDests);
-                              }}
-                              title={t.clearCoords}
-                              style={{ background: 'transparent', border: 'none', color: 'var(--color-error)', cursor: 'pointer', padding: 4, opacity: 0.7 }}
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        ) : (
-                          <div style={{ marginTop: 8, fontSize: 11, color: 'var(--color-text-3)', fontStyle: 'italic' }}>
-                            ยังไม่มีพิกัด — ค้นหาสถานที่หรือลากหมุดบนแผนที่
-                          </div>
+                        {/* Remove stop button */}
+                        {destinations.length > 1 && (
+                          <button
+                            type="button"
+                            className={styles.deleteStopBtn}
+                            onClick={() => removeDestination(index)}
+                            title={t.removeStop}
+                            aria-label={t.removeStop}
+                          >
+                            ✕
+                          </button>
                         )}
                       </div>
+                    </div>
 
-                      {/* ③ Task description */}
+                    {/* Full-width Google Places Address Search */}
+                    <div className={styles.addressSearchRow}>
+                      <AddressSearch
+                        placeholder={t.searchHint}
+                        hint=""
+                        onSelectResult={(display, lat, lng, name) => handleSelectAddress(index, display, lat, lng, name)}
+                        noResultsText={t.noResults}
+                        searchingText={t.searching}
+                      />
+                    </div>
+
+                    {/* Place Name Title & Coordinates */}
+                    <div className={styles.searchSection}>
+                      <input
+                        type="text"
+                        placeholder={`${t.placeNameHint} *`}
+                        className={styles.stopTitleInput}
+                        value={dest.title || ''}
+                        onChange={e => updateField(index, 'title', e.target.value)}
+                        required
+                        style={{ width: '100%', boxSizing: 'border-box' }}
+                      />
+
+                      {/* Coordinates info pill */}
+                      {hasCoords ? (
+                        <div className={styles.coordsBadge}>
+                          <span style={{ flexShrink: 0 }}>📌</span>
+                          <span className={styles.coordsText}>
+                            {dest.latLng!.lat.toFixed(5)}, {dest.latLng!.lng.toFixed(5)}
+                          </span>
+                          <span className={styles.coordsAddress}>
+                            — {dest.address}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newDests = [...destinations];
+                              newDests[index] = { ...newDests[index], latLng: null, address: '' };
+                              onDestinationsChange(newDests);
+                            }}
+                            title={t.clearCoords}
+                            className={styles.clearCoordsBtn}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ) : (
+                        <div className={styles.pinHintText}>
+                          💡 ค้นหาสถานที่ หรือคลิกบนแผนที่ด้านล่างเพื่อปักหมุด
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Driver Task Note & Passengers Row */}
+                    <div className={styles.stopDetailsRow}>
                       <input
                         type="text"
                         placeholder={t.descPlaceholder}
-                        className="form-input"
-                        style={{ fontSize: '0.88rem', background: 'rgba(255,255,255,0.03)' }}
+                        className={styles.taskInput}
                         value={dest.description || ''}
                         onChange={e => updateField(index, 'description', e.target.value)}
                       />
 
-                      {/* ④ Passengers */}
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', color: 'var(--color-text-2)', fontSize: '0.9rem' }}>
-                        <input
-                          type="checkbox"
-                          checked={dest.hasPassengers || false}
-                          onChange={e => updateField(index, 'hasPassengers', e.target.checked)}
-                          style={{ width: 16, height: 16, cursor: 'pointer' }}
-                        />
-                        {t.hasPassengers}
-                      </label>
-                      {dest.hasPassengers && (
-                        <input
-                          type="number"
-                          placeholder={t.count}
-                          className="form-input"
-                          style={{ width: 130, fontSize: '0.9rem', padding: '6px' }}
-                          value={dest.passengerCount || ''}
-                          onChange={e => updateField(index, 'passengerCount', parseInt(e.target.value) || 0)}
-                          min={1}
-                          required
-                        />
-                      )}
-                    </div>
+                      <div className={styles.passengerToggleArea}>
+                        <label className={styles.passengerLabel}>
+                          <input
+                            type="checkbox"
+                            checked={dest.hasPassengers || false}
+                            onChange={e => {
+                              const checked = e.target.checked;
+                              updateField(index, 'hasPassengers', checked);
+                              if (checked && (!dest.passengerCount || dest.passengerCount < 1)) {
+                                updateField(index, 'passengerCount', 1);
+                              }
+                            }}
+                            className={styles.passengerCheckbox}
+                          />
+                          <span>👥 {t.hasPassengers}</span>
+                        </label>
 
-                    {/* Remove button */}
-                    {destinations.length > 1 && (
-                      <button
-                        type="button"
-                        className={styles.removeBtn}
-                        onClick={() => removeDestination(index)}
-                        title="Remove stop"
-                      >
-                        &times;
-                      </button>
-                    )}
+                        {dest.hasPassengers && (
+                          <div className={styles.passengerStepper}>
+                            <button
+                              type="button"
+                              className={styles.stepperBtn}
+                              onClick={() => {
+                                const current = dest.passengerCount || 1;
+                                if (current > 1) {
+                                  updateField(index, 'passengerCount', current - 1);
+                                }
+                              }}
+                              disabled={(dest.passengerCount || 1) <= 1}
+                              aria-label="Decrease passenger count"
+                            >
+                              −
+                            </button>
+                            <div className={styles.stepperDisplay}>
+                              <input
+                                type="number"
+                                className={styles.passengerCountInput}
+                                value={dest.passengerCount || 1}
+                                onChange={e => {
+                                  const val = parseInt(e.target.value);
+                                  updateField(index, 'passengerCount', isNaN(val) ? 1 : Math.max(1, Math.min(20, val)));
+                                }}
+                                min={1}
+                                max={20}
+                                required
+                              />
+                              <span className={styles.stepperUnit}>
+                                {lang === 'th' ? 'คน' : 'pax'}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              className={styles.stepperBtn}
+                              onClick={() => {
+                                const current = dest.passengerCount || 1;
+                                if (current < 20) {
+                                  updateField(index, 'passengerCount', current + 1);
+                                }
+                              }}
+                              disabled={(dest.passengerCount || 1) >= 20}
+                              aria-label="Increase passenger count"
+                            >
+                              +
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </SortableStopItem>
               );
@@ -535,21 +974,34 @@ export default function MapSelector({ destinations, onDestinationsChange, maxSto
           </SortableContext>
         </DndContext>
 
-        {destinations.length < maxStops && (
-          <button type="button" className="btn-ghost" onClick={addDestination} style={{ alignSelf: 'flex-start', marginTop: 4 }}>
-            {t.addStop}
-          </button>
-        )}
+        {/* Action Buttons Row: Add Stop & Round Trip */}
+        <div className={styles.stopButtonsRow}>
+          {destinations.length < maxStops && (
+            <button type="button" className={styles.addStopBtn} onClick={addDestination}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              <span>{t.addStop}</span>
+            </button>
+          )}
+
+          {destinations.length >= 1 && destinations.length < maxStops && (
+            <button type="button" className={styles.roundTripBtn} onClick={addRoundTrip} title="Add starting point as return destination">
+              <span>{t.roundTrip}</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* ── Interactive Map ── */}
+      {/* ── Interactive Google Map ── */}
       <div className={styles.mapWrapper}>
-        <LeafletMap destinations={destinations} onMarkerDragEnd={handleMarkerDragEnd} />
+        <GoogleMapComponent
+          destinations={destinations}
+          onMarkerDragEnd={handleMarkerDragEnd}
+          onRouteStatsChange={setRouteStats}
+        />
       </div>
-
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
     </div>
   );
 }
+

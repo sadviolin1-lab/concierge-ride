@@ -96,9 +96,19 @@ const COUNTRY_CODES = [
 ];
 
 const DEPARTMENTS = [
-  'Accounting', 'Administration', 'Engineering', 'Food & Beverage',
-  'Front Office', 'Housekeeping', 'Human Resources', 'IT', 'Management',
-  'Marketing', 'Purchasing', 'Sales', 'Security', 'Spa'
+  'Accounting',
+  'Administration',
+  'Engineering',
+  'Food & Beverage',
+  'Front Office',
+  'Housekeeping',
+  'Human Resources',
+  'IT',
+  'Kitchen',
+  'Management',
+  'ResCare',
+  'Sales & Marketing',
+  'Security'
 ];
 
 export default function ProfilePage() {

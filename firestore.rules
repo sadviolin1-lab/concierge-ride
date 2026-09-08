@@ -32,6 +32,10 @@ service cloud.firestore {
       return hasRole('driver') || isAdmin();
     }
 
+    function isHR() {
+      return hasRole('hr');
+    }
+
     function isActive() {
       return isSignedIn() && getUserData().status == 'active';
     }
@@ -45,17 +49,23 @@ service cloud.firestore {
 
     // ── Users collection ─────────────────────────────────────────────
     match /users/{uid} {
-      // Users can read their own profile; Admin and Driver can read all
-      allow read: if isUser(uid) || (isActive() && (isAdmin() || isDriver()));
+      // Users can read their own profile; Admin, Driver, and HR can read all
+      allow read: if isUser(uid) || (isActive() && (isAdmin() || isDriver() || isHR()));
 
       // Only the user themselves can create their own profile (on registration)
       allow create: if isUser(uid);
 
-      // Users can update their own profile (limited); Admin can update any except Master Admin
-      allow update: if isUser(uid) || (isActive() && isAdmin() && resource.data.role != 'master_admin' && request.resource.data.role != 'master_admin');
+      // Users can update their own profile (limited); Admin and HR can update any except Master Admin
+      allow update: if isUser(uid) || (isActive() && (isAdmin() || isHR()) && resource.data.role != 'master_admin' && request.resource.data.role != 'master_admin');
 
-      // Admin can delete user profiles except Master Admin
-      allow delete: if isActive() && isAdmin() && resource.data.role != 'master_admin';
+      // Admin and HR can delete user profiles except Master Admin
+      allow delete: if isActive() && (isAdmin() || isHR()) && resource.data.role != 'master_admin';
+    }
+
+    // ── Settings collection ──────────────────────────────────────────
+    match /settings/{settingId} {
+      // Any active user can read settings (like shuttle availability)
+      allow read: if isActive();
     }
 
     // ── Shuttle Rides ─────────────────────────────────────────────────
@@ -76,9 +86,9 @@ service cloud.firestore {
 
     // ── General Requests ─────────────────────────────────────────────
     match /requests/{requestId} {
-      // Requester can read their own; Driver/Admin can read all
+      // Requester can read their own; Driver/Admin/HR can read all
       allow read: if isActive() && (
-        isDriver() || resource.data.requesterId == request.auth.uid
+        isDriver() || isHR() || resource.data.requesterId == request.auth.uid
       );
 
       // Any active staff/hr/admin can create requests

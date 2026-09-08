@@ -37,7 +37,7 @@
 .mobileHeaderLarge {
   display: flex;
   flex-direction: column;
-  padding: 16px 20px 24px;
+  padding: calc(16px + env(safe-area-inset-top, 0px)) 20px 24px;
   background: linear-gradient(135deg, var(--color-primary) 0%, #1e40af 100%);
   color: white;
   border-bottom-left-radius: 24px;

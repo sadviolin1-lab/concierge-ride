@@ -109,7 +109,7 @@ export interface ShuttleRide {
 
 // ── General Requests ─────────────────────────────────────────────────────────
 
-export type RequestStatus = 'pending' | 'approved' | 'rejected' | 'rescheduled' | 'in_progress' | 'completed';
+export type RequestStatus = 'pending' | 'approved' | 'rejected' | 'rescheduled' | 'in_progress' | 'completed' | 'urgent_pending' | 'urgent_approved' | 'urgent_rejected';
 export type RequestType = 'document' | 'parcel' | 'errand' | 'other';
 
 export interface LatLng {
@@ -158,6 +158,11 @@ export interface GeneralRequest {
   contactType?: 'self' | 'other';
   contactName?: string;
   contactPhone?: string;
+  isUrgent?: boolean;
+  urgentReason?: string;
+  urgentApprovalNote?: string;
+  suggestedDate?: string;
+  urgentApprovedAt?: number;
   isEdited?: boolean;
   editedAt?: number;
   createdAt: number;
