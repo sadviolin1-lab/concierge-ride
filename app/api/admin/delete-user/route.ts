@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getApps } from 'firebase-admin/app';
 import { adminAuth, adminDb } from '@/lib/firebase-admin';
 
 export async function POST(req: NextRequest) {
   try {
+    if (!getApps().length) {
+      return NextResponse.json({ error: 'Firebase Admin is not configured on server' }, { status: 503 });
+    }
+
     const authHeader = req.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -12,8 +17,8 @@ export async function POST(req: NextRequest) {
     let decodedToken;
     try {
       decodedToken = await adminAuth.verifyIdToken(token);
-    } catch (err) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    } catch (err: any) {
+      return NextResponse.json({ error: err?.message || 'Invalid token' }, { status: 401 });
     }
 
     const callerUid = decodedToken.uid;

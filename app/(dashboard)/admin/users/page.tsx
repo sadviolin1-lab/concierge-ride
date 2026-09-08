@@ -2,14 +2,238 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { collection, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { db, auth } from '@/lib/firebase';
 import { useAuth, formatThaiPhone } from '@/lib/auth-context';
-import type { UserProfile, UserRole, UserStatus, UserPurpose } from '@/lib/types';
+import type { UserProfile, UserRole, UserStatus } from '@/lib/types';
 import styles from './users.module.css';
 import DateInput from '@/components/DateInput';
-import { auth } from '@/lib/firebase';
 import { useLang } from '@/lib/use-lang';
+
+// ── Translations ─────────────────────────────────────────────────────────────
+
+const LANG = {
+  en: {
+    back: 'Back',
+    title: 'Manage Users',
+    subtitle: 'Review and manage employee access, roles, and account settings.',
+    total: 'Total',
+    pending: 'Pending',
+    banned: 'Banned',
+    searchLabel: 'Search:',
+    searchPlaceholder: 'Name, ID, Dept...',
+    statusLabel: 'Status:',
+    allStatuses: 'All Statuses',
+    roleLabel: 'Role:',
+    allRoles: 'All Roles',
+    clearFilters: 'Clear Filters',
+    loading: 'Loading users...',
+    noUsers: 'No users found.',
+    you: 'You',
+    bannedUntil: '🔒 Banned until',
+    bannedIndefinitely: '🔒 Banned Indefinitely',
+    expiredOn: '⏰ Expired',
+    expiringOn: '📅 Exp',
+    role: 'Role',
+    status: 'Status',
+    roles: {
+      staff: 'Staff',
+      driver: 'Driver',
+      hr: 'HR',
+      admin: 'Admin',
+      master_admin: 'Master Admin',
+    },
+    statuses: {
+      pending: 'Pending',
+      active: 'Active',
+      suspended: 'Suspended',
+      rejected: 'Rejected',
+    },
+    actions: {
+      editProfile: '✏️ Edit Profile',
+      resetPw: '🔑 Reset PW',
+      unban: '✅ Unban',
+      ban: '🔒 Ban',
+      expiry: '📅 Expiry',
+      delete: '🗑 Delete',
+    },
+    deleteModal: {
+      title: 'Delete User',
+      warningText: 'This action cannot be undone.',
+      cancel: 'Cancel',
+      confirm: '🗑 Confirm Delete',
+      deleting: 'Deleting...',
+    },
+    banModal: {
+      title: '🔒 Ban User',
+      durationLabel: 'Ban Duration:',
+      days1: '1 Day',
+      days3: '3 Days',
+      days7: '7 Days',
+      days14: '14 Days',
+      days30: '30 Days',
+      custom: 'Custom',
+      customPlaceholder: 'Number of days (1-3650)',
+      cancel: 'Cancel',
+      confirm: '🔒 Confirm Ban',
+      banning: 'Banning...',
+    },
+    expiryModal: {
+      title: '📅 Account Expiry Date',
+      note: 'Suitable for temporary staff or fixed-term contractors',
+      dateLabel: 'Expiry Date:',
+      currentDate: (dateStr: string) => `Current: ${dateStr}`,
+      cancel: 'Cancel',
+      clearExpiry: '🗑 Remove Expiry',
+      save: '📅 Save',
+      saving: 'Saving...',
+    },
+    resetModal: {
+      title: '🔑 Reset Password',
+      label: (name: string) => `New Password for ${name}`,
+      placeholder: 'Min 6 characters',
+      cancel: 'Cancel',
+      confirm: 'Reset Password',
+      resetting: 'Resetting...',
+    },
+    editModal: {
+      title: '✏️ Edit Profile',
+      empId: 'Employee ID',
+      fullName: 'Full Name *',
+      nickname: 'Nickname',
+      dept: 'Department *',
+      deptPlaceholder: 'Select Department...',
+      phone: 'Phone Number',
+      cancel: 'Cancel',
+      save: 'Save',
+      saving: 'Saving...',
+    },
+    toasts: {
+      cannotBanSelf: 'You cannot ban your own account',
+      updateFailed: 'Failed to update user',
+      banSuccess: (name: string, days: number) => `Banned ${name} for ${days} days`,
+      unbanSuccess: (name: string) => `Unbanned ${name}`,
+      setExpirySuccess: (name: string) => `Set account expiry for ${name}`,
+      clearExpirySuccess: (name: string) => `Removed account expiry for ${name}`,
+      cannotDeleteSelf: 'You cannot delete your own account',
+      deleteSuccess: 'User deleted successfully',
+      deleteFailed: 'Failed to delete user',
+      nameDeptRequired: 'Please enter name and select department',
+      profileSuccess: 'Profile updated successfully',
+      resetSuccess: (name: string) => `Password reset successfully for ${name}`,
+    }
+  },
+  th: {
+    back: 'ย้อนกลับ',
+    title: 'จัดการผู้ใช้งาน',
+    subtitle: 'ตรวจสอบและจัดการสิทธิ์ บทบาท และการตั้งค่าบัญชีพนักงาน',
+    total: 'ทั้งหมด',
+    pending: 'รออนุมัติ',
+    banned: 'ถูกแบน',
+    searchLabel: 'ค้นหา:',
+    searchPlaceholder: 'ชื่อ, รหัส, แผนก...',
+    statusLabel: 'สถานะ:',
+    allStatuses: 'ทุกสถานะ',
+    roleLabel: 'บทบาท:',
+    allRoles: 'ทุกบทบาท',
+    clearFilters: 'ล้างตัวกรอง',
+    loading: 'กำลังโหลดข้อมูลผู้ใช้...',
+    noUsers: 'ไม่พบผู้ใช้งาน',
+    you: 'บัญชีของคุณ',
+    bannedUntil: '🔒 ถูกแบนจนถึง',
+    bannedIndefinitely: '🔒 ถูกแบนไม่มีกำหนด',
+    expiredOn: '⏰ หมดอายุ',
+    expiringOn: '📅 หมดอายุ',
+    role: 'บทบาท',
+    status: 'สถานะ',
+    roles: {
+      staff: 'พนักงานทั่วไป (Staff)',
+      driver: 'คนขับ (Driver)',
+      hr: 'ฝ่ายบุคคล (HR)',
+      admin: 'ผู้ดูแลระบบ (Admin)',
+      master_admin: 'ผู้ดูแลระบบสูงสุด (Master Admin)',
+    },
+    statuses: {
+      pending: 'รออนุมัติ',
+      active: 'ใช้งานอยู่',
+      suspended: 'ถูกระงับ (แบน)',
+      rejected: 'ปฏิเสธ',
+    },
+    actions: {
+      editProfile: '✏️ แก้ไขข้อมูล',
+      resetPw: '🔑 รีเซ็ตรหัสผ่าน',
+      unban: '✅ ปลดแบน',
+      ban: '🔒 แบน',
+      expiry: '📅 วันหมดอายุ',
+      delete: '🗑 ลบผู้ใช้',
+    },
+    deleteModal: {
+      title: 'ลบผู้ใช้งาน',
+      warningText: 'การกระทำนี้ไม่สามารถยกเลิกได้',
+      cancel: 'ยกเลิก',
+      confirm: '🗑 ยืนยันลบ',
+      deleting: 'กำลังลบ...',
+    },
+    banModal: {
+      title: '🔒 แบนผู้ใช้งาน',
+      durationLabel: 'ระยะเวลาแบน:',
+      days1: '1 วัน',
+      days3: '3 วัน',
+      days7: '7 วัน',
+      days14: '14 วัน',
+      days30: '30 วัน',
+      custom: 'กำหนดเอง',
+      customPlaceholder: 'จำนวนวัน (1-3650)',
+      cancel: 'ยกเลิก',
+      confirm: '🔒 ยืนยันการแบน',
+      banning: 'กำลังแบน...',
+    },
+    expiryModal: {
+      title: '📅 กำหนดวันหมดอายุบัญชี',
+      note: 'เหมาะสำหรับพนักงานชั่วคราวที่มีวันสิ้นสุดสัญญา',
+      dateLabel: 'วันที่หมดอายุ:',
+      currentDate: (dateStr: string) => `ปัจจุบัน: ${dateStr}`,
+      cancel: 'ยกเลิก',
+      clearExpiry: '🗑 ลบวันหมดอายุ',
+      save: '📅 บันทึก',
+      saving: 'กำลังบันทึก...',
+    },
+    resetModal: {
+      title: '🔑 รีเซ็ตรหัสผ่าน',
+      label: (name: string) => `รหัสผ่านใหม่สำหรับ ${name}`,
+      placeholder: 'อย่างน้อย 6 ตัวอักษร',
+      cancel: 'ยกเลิก',
+      confirm: 'รีเซ็ตรหัสผ่าน',
+      resetting: 'กำลังรีเซ็ต...',
+    },
+    editModal: {
+      title: '✏️ แก้ไขโปรไฟล์',
+      empId: 'รหัสพนักงาน',
+      fullName: 'ชื่อ-นามสกุล *',
+      nickname: 'ชื่อเล่น',
+      dept: 'แผนก *',
+      deptPlaceholder: 'เลือกแผนก...',
+      phone: 'เบอร์โทรศัพท์',
+      cancel: 'ยกเลิก',
+      save: 'บันทึก',
+      saving: 'กำลังบันทึก...',
+    },
+    toasts: {
+      cannotBanSelf: 'คุณไม่สามารถแบนบัญชีของตัวเองได้',
+      updateFailed: 'อัปเดตข้อมูลไม่สำเร็จ',
+      banSuccess: (name: string, days: number) => `แบน ${name} เป็นเวลา ${days} วัน`,
+      unbanSuccess: (name: string) => `ปลดแบน ${name} แล้ว`,
+      setExpirySuccess: (name: string) => `กำหนดวันหมดอายุให้ ${name} แล้ว`,
+      clearExpirySuccess: (name: string) => `ลบวันหมดอายุของ ${name} แล้ว`,
+      cannotDeleteSelf: 'คุณไม่สามารถลบบัญชีของตัวเองได้',
+      deleteSuccess: 'ลบผู้ใช้สำเร็จ',
+      deleteFailed: 'ลบไม่สำเร็จ',
+      nameDeptRequired: 'กรุณากรอกชื่อและเลือกแผนกให้ครบถ้วน',
+      profileSuccess: 'แก้ไขข้อมูลโปรไฟล์สำเร็จ',
+      resetSuccess: (name: string) => `รีเซ็ตรหัสผ่านของ ${name} สำเร็จ`,
+    }
+  }
+};
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -59,6 +283,7 @@ export default function ManageUsersPage() {
   const router = useRouter();
   const { userProfile, isMasterAdmin, isAdmin, isHR } = useAuth();
   const { lang } = useLang();
+  const t = LANG[lang];
   const hasAccess = isAdmin || isHR;
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,8 +297,6 @@ export default function ManageUsersPage() {
   const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
-
-
 
   const [banModal, setBanModal] = useState<{ uid: string; name: string } | null>(null);
   const [banDays, setBanDays] = useState('7');
@@ -126,7 +349,7 @@ export default function ManageUsersPage() {
 
   const patchUser = async (uid: string, data: Partial<UserProfile>) => {
     if (userProfile && uid === userProfile.uid && data.status === 'suspended') {
-      showToast('คุณไม่สามารถแบนบัญชีของตัวเองได้');
+      showToast(t.toasts.cannotBanSelf);
       return;
     }
     setIsUpdating(true);
@@ -135,7 +358,7 @@ export default function ManageUsersPage() {
       setUsers(prev => prev.map(u => u.uid === uid ? { ...u, ...data } : u));
     } catch (err) {
       console.error(err);
-      showToast('อัปเดตข้อมูลไม่สำเร็จ');
+      showToast(t.toasts.updateFailed);
     } finally {
       setIsUpdating(false);
     }
@@ -146,7 +369,7 @@ export default function ManageUsersPage() {
     e.preventDefault();
     if (!banModal) return;
     if (userProfile && banModal.uid === userProfile.uid) {
-      showToast('คุณไม่สามารถแบนบัญชีของตัวเองได้');
+      showToast(t.toasts.cannotBanSelf);
       setBanModal(null);
       return;
     }
@@ -154,12 +377,12 @@ export default function ManageUsersPage() {
     const suspendedUntil = Date.now() + days * 86400000;
     await patchUser(banModal.uid, { status: 'suspended', suspendedUntil });
     setBanModal(null);
-    showToast(`แบน ${banModal.name} เป็นเวลา ${days} วัน`, 'success');
+    showToast(t.toasts.banSuccess(banModal.name, days), 'success');
   };
 
   const handleUnban = async (uid: string, name: string) => {
     await patchUser(uid, { status: 'active', suspendedUntil: null as any });
-    showToast(`ปลดแบน ${name} แล้ว`, 'success');
+    showToast(t.toasts.unbanSuccess(name), 'success');
   };
 
   // ── Expiry ───────────────────────────────────────────────────────────────
@@ -169,36 +392,54 @@ export default function ManageUsersPage() {
     const ts = new Date(expiryDate).getTime();
     await patchUser(expiryModal.uid, { accountExpiresAt: ts });
     setExpiryModal(null);
-    showToast(`กำหนดวันหมดอายุให้ ${expiryModal.name} แล้ว`, 'success');
+    showToast(t.toasts.setExpirySuccess(expiryModal.name), 'success');
   };
 
   const handleClearExpiry = async (uid: string, name: string) => {
     await patchUser(uid, { accountExpiresAt: undefined });
-    showToast(`ลบวันหมดอายุของ ${name} แล้ว`, 'success');
+    showToast(t.toasts.clearExpirySuccess(name), 'success');
   };
 
   // ── Delete ───────────────────────────────────────────────────────────────
   const handleConfirmDelete = async () => {
     if (!deleteModal) return;
     if (userProfile && deleteModal.uid === userProfile.uid) {
-      showToast('คุณไม่สามารถลบบัญชีของตัวเองได้');
+      showToast(t.toasts.cannotDeleteSelf);
       setDeleteModal(null);
       return;
     }
     setIsUpdating(true);
     try {
-      const token = await auth.currentUser?.getIdToken();
-      const res = await fetch('/api/admin/delete-user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ targetUid: deleteModal.uid })
-      });
-      if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
+      let apiSuccess = false;
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        const res = await fetch('/api/admin/delete-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ targetUid: deleteModal.uid })
+        });
+        if (res.ok) {
+          apiSuccess = true;
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          console.warn('API delete-user returned error:', res.status, errData);
+        }
+      } catch (apiErr) {
+        console.warn('API delete-user request failed, falling back to direct Firestore delete:', apiErr);
+      }
+
+      // If API failed (e.g. Firebase Admin is not configured on local server),
+      // delete user doc directly from Firestore using client SDK (authorized by firestore.rules for Admin/HR)
+      if (!apiSuccess) {
+        await deleteDoc(doc(db, 'users', deleteModal.uid));
+      }
+
       setUsers(prev => prev.filter(u => u.uid !== deleteModal.uid));
       setDeleteModal(null);
-      showToast('ลบผู้ใช้สำเร็จ', 'success');
+      showToast(t.toasts.deleteSuccess, 'success');
     } catch (err: any) {
-      showToast(err.message || 'ลบไม่สำเร็จ');
+      console.error('Delete user error:', err);
+      showToast(err.message || t.toasts.deleteFailed);
     } finally {
       setIsUpdating(false);
     }
@@ -210,7 +451,7 @@ export default function ManageUsersPage() {
 
     const { uid, fullName, nickname, department, phone } = editProfileModal;
     if (!fullName.trim() || !department.trim()) {
-      showToast('กรุณากรอกชื่อและเลือกแผนกให้ครบถ้วน');
+      showToast(t.toasts.nameDeptRequired);
       return;
     }
 
@@ -224,7 +465,7 @@ export default function ManageUsersPage() {
     });
 
     setEditProfileModal(null);
-    showToast('แก้ไขข้อมูลโปรไฟล์สำเร็จ', 'success');
+    showToast(t.toasts.profileSuccess, 'success');
   };
 
   // ── Reset Password ────────────────────────────────────────────────────────
@@ -241,7 +482,7 @@ export default function ManageUsersPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      showToast(`รีเซ็ตรหัสผ่านของ ${resetModal.name} สำเร็จ`, 'success');
+      showToast(t.toasts.resetSuccess(resetModal.name), 'success');
       setResetModal(null);
       setNewPassword('');
     } catch (err: any) {
@@ -280,25 +521,25 @@ export default function ManageUsersPage() {
   // ═══════════════════════════════════════════════════════════════════════════
   return (
     <div className={styles.page}>
-      <button onClick={() => router.back()} className={styles.backBtn} aria-label="Go back">
+      <button onClick={() => router.back()} className={styles.backBtn} aria-label={t.back}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
         </svg>
-        <span>Back</span>
+        <span>{t.back}</span>
       </button>
 
       <div className={styles.header}>
         <div>
-          <h1 className={styles.title}>Manage Users</h1>
-          <p className={styles.subtitle}>Review and manage employee access, roles, and account settings.</p>
+          <h1 className={styles.title}>{t.title}</h1>
+          <p className={styles.subtitle}>{t.subtitle}</p>
         </div>
         <div className={styles.headerStats}>
-          <span className={styles.statChip}>{users.length} Total</span>
+          <span className={styles.statChip}>{users.length} {t.total}</span>
           <span className={styles.statChip} style={{ color: 'var(--color-warning)' }}>
-            {users.filter(u => u.status === 'pending').length} Pending
+            {users.filter(u => u.status === 'pending').length} {t.pending}
           </span>
           <span className={styles.statChip} style={{ color: 'var(--color-danger)' }}>
-            {users.filter(isBanned).length} Banned
+            {users.filter(isBanned).length} {t.banned}
           </span>
         </div>
       </div>
@@ -306,38 +547,38 @@ export default function ManageUsersPage() {
       {/* Filters */}
       <div className={styles.filters}>
         <div className={styles.filterGroup}>
-          <label className={styles.filterLabel} htmlFor="search-filter">Search:</label>
+          <label className={styles.filterLabel} htmlFor="search-filter">{t.searchLabel}</label>
           <input
             id="search-filter"
             type="text"
             className="form-input"
-            placeholder="Name, ID, Dept..."
+            placeholder={t.searchPlaceholder}
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             style={{ minWidth: 200 }}
           />
         </div>
         <div className={styles.filterGroup}>
-          <label className={styles.filterLabel} htmlFor="status-filter">Status:</label>
+          <label className={styles.filterLabel} htmlFor="status-filter">{t.statusLabel}</label>
           <select id="status-filter" className="form-select" style={{ minWidth: 140 }}
             value={statusFilter} onChange={e => setStatusFilter(e.target.value as UserStatus | 'all')}>
-            <option value="all">All Statuses</option>
-            <option value="pending">Pending</option>
-            <option value="active">Active</option>
-            <option value="suspended">Suspended</option>
-            <option value="rejected">Rejected</option>
+            <option value="all">{t.allStatuses}</option>
+            <option value="pending">{t.statuses.pending}</option>
+            <option value="active">{t.statuses.active}</option>
+            <option value="suspended">{t.statuses.suspended}</option>
+            <option value="rejected">{t.statuses.rejected}</option>
           </select>
         </div>
         <div className={styles.filterGroup}>
-          <label className={styles.filterLabel} htmlFor="role-filter">Role:</label>
+          <label className={styles.filterLabel} htmlFor="role-filter">{t.roleLabel}</label>
           <select id="role-filter" className="form-select" style={{ minWidth: 140 }}
             value={roleFilter} onChange={e => setRoleFilter(e.target.value as UserRole | 'all')}>
-            <option value="all">All Roles</option>
-            <option value="staff">Staff</option>
-            <option value="driver">Driver</option>
-            <option value="hr">HR</option>
-            <option value="admin">Admin</option>
-            <option value="master_admin">Master Admin</option>
+            <option value="all">{t.allRoles}</option>
+            <option value="staff">{t.roles.staff}</option>
+            <option value="driver">{t.roles.driver}</option>
+            <option value="hr">{t.roles.hr}</option>
+            <option value="admin">{t.roles.admin}</option>
+            <option value="master_admin">{t.roles.master_admin}</option>
           </select>
         </div>
         {(searchQuery || statusFilter !== 'all' || roleFilter !== 'all') && (
@@ -350,7 +591,7 @@ export default function ManageUsersPage() {
               setRoleFilter('all');
             }}
           >
-            Clear Filters
+            {t.clearFilters}
           </button>
         )}
       </div>
@@ -360,10 +601,10 @@ export default function ManageUsersPage() {
         {loading ? (
           <div className={styles.loadingWrap}>
             <div className="spinner" style={{ color: 'var(--color-primary)' }} />
-            <span>Loading users...</span>
+            <span>{t.loading}</span>
           </div>
         ) : filteredUsers.length === 0 ? (
-          <div className={styles.emptyState}>No users found.</div>
+          <div className={styles.emptyState}>{t.noUsers}</div>
         ) : filteredUsers.map(u => {
           const sc = statusColor(u.status);
           const banned = isBanned(u);
@@ -392,19 +633,19 @@ export default function ManageUsersPage() {
                         alignItems: 'center',
                         gap: '4px'
                       }}>
-                        👤 {lang === 'th' ? 'บัญชีของคุณ' : 'You'}
+                        👤 {t.you}
                       </span>
                     )}
                     {banned && (
                       <span className={styles.tagBanned}>
-                        🔒 Banned {u.suspendedUntil ? `until ${formatDate(u.suspendedUntil, lang)}` : 'Indefinitely'}
+                        {u.suspendedUntil ? `${t.bannedUntil} ${formatDate(u.suspendedUntil, lang)}` : t.bannedIndefinitely}
                       </span>
                     )}
                     {expired && !banned && (
-                      <span className={styles.tagExpired}>⏰ Expired {formatDate(u.accountExpiresAt!, lang)}</span>
+                      <span className={styles.tagExpired}>{t.expiredOn} {formatDate(u.accountExpiresAt!, lang)}</span>
                     )}
                     {u.accountExpiresAt && !expired && (
-                      <span className={styles.tagExpiry}>📅 Exp {formatDate(u.accountExpiresAt, lang)}</span>
+                      <span className={styles.tagExpiry}>{t.expiringOn} {formatDate(u.accountExpiresAt, lang)}</span>
                     )}
                   </div>
                   <span className={styles.userEmail}>{u.email || u.phone}</span>
@@ -418,22 +659,22 @@ export default function ManageUsersPage() {
               {/* ── Middle: Role & Status selects ────────── */}
               <div className={styles.cardMid}>
                 <div className={styles.fieldGroup}>
-                  <label className={styles.fieldLabel}>Role</label>
+                  <label className={styles.fieldLabel}>{t.role}</label>
                   <select
                     className={styles.actionSelect}
                     value={u.role}
                     onChange={e => patchUser(u.uid, { role: e.target.value as UserRole })}
                     disabled={!canManage(u) || isUpdating}
                   >
-                    <option value="staff">Staff</option>
-                    <option value="driver">Driver</option>
-                    <option value="hr">HR</option>
-                    <option value="admin">Admin</option>
-                    {isMasterAdmin && <option value="master_admin">Master Admin</option>}
+                    <option value="staff">{t.roles.staff}</option>
+                    <option value="driver">{t.roles.driver}</option>
+                    <option value="hr">{t.roles.hr}</option>
+                    <option value="admin">{t.roles.admin}</option>
+                    {isMasterAdmin && <option value="master_admin">{t.roles.master_admin}</option>}
                   </select>
                 </div>
                 <div className={styles.fieldGroup}>
-                  <label className={styles.fieldLabel}>Status</label>
+                  <label className={styles.fieldLabel}>{t.status}</label>
                   <select
                     className={styles.actionSelect}
                     style={{ color: sc.color, borderColor: sc.border, background: sc.bg }}
@@ -448,10 +689,10 @@ export default function ManageUsersPage() {
                     }}
                     disabled={!canManage(u) || isUpdating}
                   >
-                    <option value="pending">Pending</option>
-                    <option value="active">Active</option>
-                    <option value="rejected">Rejected</option>
-                    {u.status === 'suspended' && <option value="suspended" disabled>Suspended</option>}
+                    <option value="pending">{t.statuses.pending}</option>
+                    <option value="active">{t.statuses.active}</option>
+                    <option value="rejected">{t.statuses.rejected}</option>
+                    {u.status === 'suspended' && <option value="suspended" disabled>{t.statuses.suspended}</option>}
                   </select>
                 </div>
               </div>
@@ -473,9 +714,9 @@ export default function ManageUsersPage() {
                     });
                   }}
                   disabled={!canManage(u) || isUpdating}
-                  title="Edit Profile"
+                  title={t.actions.editProfile}
                 >
-                  ✏️ Edit Profile
+                  {t.actions.editProfile}
                 </button>
 
                 {/* Reset Password */}
@@ -483,9 +724,9 @@ export default function ManageUsersPage() {
                   className={styles.actionBtn}
                   onClick={() => setResetModal({ isOpen: true, uid: u.uid, name: u.fullName })}
                   disabled={!canManage(u) || isUpdating}
-                  title="Reset Password"
+                  title={t.actions.resetPw}
                 >
-                  🔑 Reset PW
+                  {t.actions.resetPw}
                 </button>
 
                 {/* Ban / Unban */}
@@ -494,24 +735,24 @@ export default function ManageUsersPage() {
                     className={styles.actionBtnWarning}
                     onClick={() => handleUnban(u.uid, u.fullName)}
                     disabled={!canManage(u) || isUpdating || isSelf}
-                    title={isSelf ? (lang === 'th' ? 'ไม่สามารถปลดแบนตัวเองได้' : 'Cannot unban yourself') : 'Unban'}
+                    title={isSelf ? t.toasts.cannotBanSelf : t.actions.unban}
                   >
-                    ✅ Unban
+                    {t.actions.unban}
                   </button>
                 ) : (
                   <button
                     className={styles.actionBtnOrange}
                     onClick={() => {
                       if (isSelf) {
-                        showToast(lang === 'th' ? 'คุณไม่สามารถแบนบัญชีของตัวเองได้' : 'You cannot ban your own account');
+                        showToast(t.toasts.cannotBanSelf);
                         return;
                       }
                       setBanModal({ uid: u.uid, name: u.fullName });
                     }}
                     disabled={!canManage(u) || isUpdating || isSelf}
-                    title={isSelf ? (lang === 'th' ? 'ไม่สามารถแบนตัวเองได้' : 'Cannot ban yourself') : 'Ban User'}
+                    title={isSelf ? t.toasts.cannotBanSelf : t.actions.ban}
                   >
-                    🔒 Ban
+                    {t.actions.ban}
                   </button>
                 )}
 
@@ -528,9 +769,9 @@ export default function ManageUsersPage() {
                     }
                   }}
                   disabled={!canManage(u) || isUpdating}
-                  title="Set Account Expiry"
+                  title={t.actions.expiry}
                 >
-                  📅 Expiry
+                  {t.actions.expiry}
                 </button>
 
                 {/* Delete */}
@@ -538,15 +779,15 @@ export default function ManageUsersPage() {
                   className={styles.actionBtnDanger}
                   onClick={() => {
                     if (isSelf) {
-                      showToast(lang === 'th' ? 'คุณไม่สามารถลบบัญชีของตัวเองได้' : 'You cannot delete your own account');
+                      showToast(t.toasts.cannotDeleteSelf);
                       return;
                     }
                     setDeleteModal({ uid: u.uid, name: u.fullName });
                   }}
                   disabled={!canManage(u) || isUpdating || isSelf}
-                  title={isSelf ? (lang === 'th' ? 'ไม่สามารถลบบัญชีตัวเองได้' : 'Cannot delete yourself') : 'Cannot delete yourself'}
+                  title={isSelf ? t.toasts.cannotDeleteSelf : t.actions.delete}
                 >
-                  🗑 Delete
+                  {t.actions.delete}
                 </button>
               </div>
             </div>
@@ -563,19 +804,19 @@ export default function ManageUsersPage() {
         <div className={styles.modalOverlay} onClick={() => !resetLoading && setResetModal(null)}>
           <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>🔑 Reset Password</h3>
+              <h3 className={styles.modalTitle}>{t.resetModal.title}</h3>
               <ModalCloseBtn onClick={() => setResetModal(null)} disabled={resetLoading} />
             </div>
             <form onSubmit={handleResetPassword}>
               <div className="form-group">
-                <label className="form-label">New Password for <strong>{resetModal.name}</strong></label>
+                <label className="form-label">{t.resetModal.label(resetModal.name)}</label>
                 <div style={{ position: 'relative' }}>
                   <input
                     type={showPassword ? 'text' : 'password'}
                     className="form-input"
                     value={newPassword}
                     onChange={e => setNewPassword(e.target.value)}
-                    placeholder="Min 6 characters"
+                    placeholder={t.resetModal.placeholder}
                     required minLength={6}
                     style={{ paddingRight: 44 }}
                   />
@@ -592,9 +833,11 @@ export default function ManageUsersPage() {
                 </div>
               </div>
               <div className={styles.modalActions}>
-                <button type="button" className="btn btn-secondary" onClick={() => setResetModal(null)} disabled={resetLoading} style={{ flex:1 }}>Cancel</button>
+                <button type="button" className="btn btn-secondary" onClick={() => setResetModal(null)} disabled={resetLoading} style={{ flex:1 }}>
+                  {t.resetModal.cancel}
+                </button>
                 <button type="submit" className="btn btn-primary" disabled={resetLoading} style={{ flex:1 }}>
-                  {resetLoading ? <><span className="spinner" style={{ borderTopColor:'white' }} /> Resetting...</> : 'Reset Password'}
+                  {resetLoading ? <><span className="spinner" style={{ borderTopColor:'white' }} /> {t.resetModal.resetting}</> : t.resetModal.confirm}
                 </button>
               </div>
             </form>
@@ -602,24 +845,33 @@ export default function ManageUsersPage() {
         </div>
       )}
 
-
-
       {/* Ban Modal */}
       {banModal && (
         <div className={styles.modalOverlay} onClick={() => !isUpdating && setBanModal(null)}>
           <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>🔒 Ban User</h3>
+              <h3 className={styles.modalTitle}>{t.banModal.title}</h3>
               <ModalCloseBtn onClick={() => setBanModal(null)} disabled={isUpdating} />
             </div>
             <p style={{ fontSize:'0.9rem', color:'var(--color-text-2)', marginBottom:16 }}>
-              แบนบัญชีของ <strong style={{ color:'var(--color-text-1)' }}>{banModal.name}</strong> ผู้ใช้จะไม่สามารถเข้าสู่ระบบได้จนกว่าจะหมดอายุการแบน
+              {lang === 'en' ? (
+                <>Ban account for <strong style={{ color:'var(--color-text-1)' }}>{banModal.name}</strong>. The user will not be able to log in until the ban expires.</>
+              ) : (
+                <>แบนบัญชีของ <strong style={{ color:'var(--color-text-1)' }}>{banModal.name}</strong> ผู้ใช้จะไม่สามารถเข้าสู่ระบบได้จนกว่าจะหมดอายุการแบน</>
+              )}
             </p>
             <form onSubmit={handleBan}>
               <div className="form-group">
-                <label className="form-label">ระยะเวลาแบน:</label>
+                <label className="form-label">{t.banModal.durationLabel}</label>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom: banDays === 'custom' ? 12 : 0 }}>
-                  {[['1','1 วัน'],['3','3 วัน'],['7','7 วัน'],['14','14 วัน'],['30','30 วัน'],['custom','กำหนดเอง']].map(([val, label]) => (
+                  {[
+                    ['1', t.banModal.days1],
+                    ['3', t.banModal.days3],
+                    ['7', t.banModal.days7],
+                    ['14', t.banModal.days14],
+                    ['30', t.banModal.days30],
+                    ['custom', t.banModal.custom]
+                  ].map(([val, label]) => (
                     <label key={val} style={{
                       display:'flex', alignItems:'center', gap:8, padding:'10px 14px',
                       border:`2px solid ${banDays === val ? 'var(--color-danger)' : 'var(--color-border)'}`,
@@ -636,17 +888,19 @@ export default function ManageUsersPage() {
                 {banDays === 'custom' && (
                   <input
                     type="number" className="form-input" min={1} max={3650}
-                    placeholder="จำนวนวัน (1-3650)"
+                    placeholder={t.banModal.customPlaceholder}
                     value={banCustomDays} onChange={e => setBanCustomDays(e.target.value)}
                     required style={{ marginTop:8 }}
                   />
                 )}
               </div>
               <div className={styles.modalActions}>
-                <button type="button" className="btn btn-secondary" onClick={() => setBanModal(null)} disabled={isUpdating} style={{ flex:1 }}>ยกเลิก</button>
+                <button type="button" className="btn btn-secondary" onClick={() => setBanModal(null)} disabled={isUpdating} style={{ flex:1 }}>
+                  {t.banModal.cancel}
+                </button>
                 <button type="submit" className="btn" disabled={isUpdating}
                   style={{ flex:1, background:'linear-gradient(135deg,#DC2626,#991B1B)', color:'white', boxShadow:'0 4px 12px rgba(220,38,38,0.35)' }}>
-                  {isUpdating ? <><span className="spinner" style={{ borderTopColor:'white' }} /> กำลังแบน...</> : '🔒 ยืนยันการแบน'}
+                  {isUpdating ? <><span className="spinner" style={{ borderTopColor:'white' }} /> {t.banModal.banning}</> : t.banModal.confirm}
                 </button>
               </div>
             </form>
@@ -659,16 +913,20 @@ export default function ManageUsersPage() {
         <div className={styles.modalOverlay} onClick={() => !isUpdating && setExpiryModal(null)}>
           <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>📅 Account Expiry Date</h3>
+              <h3 className={styles.modalTitle}>{t.expiryModal.title}</h3>
               <ModalCloseBtn onClick={() => setExpiryModal(null)} disabled={isUpdating} />
             </div>
             <p style={{ fontSize:'0.9rem', color:'var(--color-text-2)', marginBottom:16 }}>
-              กำหนดวันหมดอายุบัญชีสำหรับ <strong style={{ color:'var(--color-text-1)' }}>{expiryModal.name}</strong>
-              <br/><span style={{ fontSize:'0.8rem' }}>เหมาะสำหรับพนักงานชั่วคราวที่มีวันสิ้นสุดสัญญา</span>
+              {lang === 'en' ? (
+                <>Set account expiry date for <strong style={{ color:'var(--color-text-1)' }}>{expiryModal.name}</strong></>
+              ) : (
+                <>กำหนดวันหมดอายุบัญชีสำหรับ <strong style={{ color:'var(--color-text-1)' }}>{expiryModal.name}</strong></>
+              )}
+              <br/><span style={{ fontSize:'0.8rem' }}>{t.expiryModal.note}</span>
             </p>
             <form onSubmit={handleSetExpiry}>
               <div className="form-group">
-                <label className="form-label">วันที่หมดอายุ:</label>
+                <label className="form-label">{t.expiryModal.dateLabel}</label>
                 <DateInput
                   value={expiryDate}
                   onChange={e => setExpiryDate(e.target.value)}
@@ -677,21 +935,23 @@ export default function ManageUsersPage() {
                 />
                 {expiryModal.current && (
                   <p style={{ fontSize:'0.78rem', color:'var(--color-text-3)', marginTop:6 }}>
-                    ปัจจุบัน: {formatDate(expiryModal.current, lang)}
+                    {t.expiryModal.currentDate(formatDate(expiryModal.current, lang))}
                   </p>
                 )}
               </div>
               <div className={styles.modalActions} style={{ flexWrap:'wrap' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setExpiryModal(null)} disabled={isUpdating} style={{ flex:1, minWidth:100 }}>ยกเลิก</button>
+                <button type="button" className="btn btn-secondary" onClick={() => setExpiryModal(null)} disabled={isUpdating} style={{ flex:1, minWidth:100 }}>
+                  {t.expiryModal.cancel}
+                </button>
                 {expiryModal.current && (
                   <button type="button" className="btn btn-secondary" disabled={isUpdating}
                     onClick={() => { handleClearExpiry(expiryModal.uid, expiryModal.name); setExpiryModal(null); }}
                     style={{ flex:1, minWidth:100, color:'var(--color-danger)', borderColor:'rgba(239,68,68,0.3)' }}>
-                    🗑 ลบวันหมดอายุ
+                    {t.expiryModal.clearExpiry}
                   </button>
                 )}
                 <button type="submit" className="btn btn-primary" disabled={isUpdating} style={{ flex:1, minWidth:100 }}>
-                  {isUpdating ? <><span className="spinner" style={{ borderTopColor:'white' }} /> บันทึก...</> : '📅 บันทึก'}
+                  {isUpdating ? <><span className="spinner" style={{ borderTopColor:'white' }} /> {t.expiryModal.saving}</> : t.expiryModal.save}
                 </button>
               </div>
             </form>
@@ -712,18 +972,27 @@ export default function ManageUsersPage() {
                 </svg>
               </div>
               <div style={{ textAlign:'center' }}>
-                <h3 style={{ fontSize:'1.1rem', fontWeight:700, color:'var(--color-text-1)', marginBottom:6 }}>ลบผู้ใช้งาน</h3>
+                <h3 style={{ fontSize:'1.1rem', fontWeight:700, color:'var(--color-text-1)', marginBottom:6 }}>
+                  {t.deleteModal.title}
+                </h3>
                 <p style={{ fontSize:'0.9rem', color:'var(--color-text-2)', lineHeight:1.6 }}>
-                  คุณต้องการลบ <strong style={{ color:'var(--color-text-1)' }}>{deleteModal.name}</strong> อย่างถาวรใช่ไหม?<br/>
-                  <span style={{ color:'var(--color-danger)', fontSize:'0.82rem' }}>การกระทำนี้ไม่สามารถยกเลิกได้</span>
+                  {lang === 'en' ? (
+                    <>Are you sure you want to permanently delete <strong style={{ color:'var(--color-text-1)' }}>{deleteModal.name}</strong>?</>
+                  ) : (
+                    <>คุณต้องการลบ <strong style={{ color:'var(--color-text-1)' }}>{deleteModal.name}</strong> อย่างถาวรใช่ไหม?</>
+                  )}
+                  <br/>
+                  <span style={{ color:'var(--color-danger)', fontSize:'0.82rem' }}>{t.deleteModal.warningText}</span>
                 </p>
               </div>
             </div>
             <div className={styles.modalActions} style={{ marginTop:8 }}>
-              <button className="btn btn-secondary" onClick={() => setDeleteModal(null)} disabled={isUpdating} style={{ flex:1 }}>ยกเลิก</button>
+              <button className="btn btn-secondary" onClick={() => setDeleteModal(null)} disabled={isUpdating} style={{ flex:1 }}>
+                {t.deleteModal.cancel}
+              </button>
               <button className="btn" onClick={handleConfirmDelete} disabled={isUpdating}
                 style={{ flex:1, background:'linear-gradient(135deg,#DC2626,#991B1B)', color:'white', boxShadow:'0 4px 12px rgba(220,38,38,0.35)' }}>
-                {isUpdating ? <><span className="spinner" style={{ borderTopColor:'white' }} /> กำลังลบ...</> : '🗑 ยืนยันลบ'}
+                {isUpdating ? <><span className="spinner" style={{ borderTopColor:'white' }} /> {t.deleteModal.deleting}</> : t.deleteModal.confirm}
               </button>
             </div>
           </div>
@@ -735,16 +1004,16 @@ export default function ManageUsersPage() {
         <div className={styles.modalOverlay} onClick={() => !isUpdating && setEditProfileModal(null)}>
           <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>✏️ Edit Profile</h3>
+              <h3 className={styles.modalTitle}>{t.editModal.title}</h3>
               <ModalCloseBtn onClick={() => setEditProfileModal(null)} disabled={isUpdating} />
             </div>
             <form onSubmit={handleSaveProfile}>
               <div className="form-group" style={{ marginBottom: 12 }}>
-                <label className="form-label">Employee ID</label>
+                <label className="form-label">{t.editModal.empId}</label>
                 <input type="text" className="form-input" value={editProfileModal.employeeId} disabled style={{ opacity: 0.5 }} />
               </div>
               <div className="form-group" style={{ marginBottom: 12 }}>
-                <label className="form-label">Full Name *</label>
+                <label className="form-label">{t.editModal.fullName}</label>
                 <input
                   type="text"
                   className="form-input"
@@ -754,7 +1023,7 @@ export default function ManageUsersPage() {
                 />
               </div>
               <div className="form-group" style={{ marginBottom: 12 }}>
-                <label className="form-label">Nickname</label>
+                <label className="form-label">{t.editModal.nickname}</label>
                 <input
                   type="text"
                   className="form-input"
@@ -763,19 +1032,19 @@ export default function ManageUsersPage() {
                 />
               </div>
               <div className="form-group" style={{ marginBottom: 12 }}>
-                <label className="form-label">Department *</label>
+                <label className="form-label">{t.editModal.dept}</label>
                 <select
                   className="form-select"
                   value={editProfileModal.department}
                   onChange={e => setEditProfileModal(prev => prev ? { ...prev, department: e.target.value } : null)}
                   required
                 >
-                  <option value="" disabled>Select Department...</option>
+                  <option value="" disabled>{t.editModal.deptPlaceholder}</option>
                   {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
                 </select>
               </div>
               <div className="form-group" style={{ marginBottom: 20 }}>
-                <label className="form-label">Phone Number</label>
+                <label className="form-label">{t.editModal.phone}</label>
                 <input
                   type="tel"
                   className="form-input"
@@ -785,9 +1054,11 @@ export default function ManageUsersPage() {
                 />
               </div>
               <div className={styles.modalActions}>
-                <button type="button" className="btn btn-secondary" onClick={() => setEditProfileModal(null)} disabled={isUpdating} style={{ flex: 1 }}>Cancel</button>
+                <button type="button" className="btn btn-secondary" onClick={() => setEditProfileModal(null)} disabled={isUpdating} style={{ flex: 1 }}>
+                  {t.editModal.cancel}
+                </button>
                 <button type="submit" className="btn btn-primary" disabled={isUpdating} style={{ flex: 1 }}>
-                  {isUpdating ? <><span className="spinner" style={{ borderTopColor: 'white' }} /> Saving...</> : 'Save'}
+                  {isUpdating ? <><span className="spinner" style={{ borderTopColor: 'white' }} /> {t.editModal.saving}</> : t.editModal.save}
                 </button>
               </div>
             </form>

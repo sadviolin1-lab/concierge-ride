@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   completeDirectRegistration,
-  formatThaiPhone,
   type PhoneRegisterData,
 } from '@/lib/auth-context';
 import { useLang, type Lang } from '@/lib/use-lang';
@@ -17,13 +16,10 @@ const T = {
   en: {
     heading:      'Create an Account',
     subHeading:   'Enter your details — Admin will review and approve your account.',
-    photoHint:    'Profile Photo *',
+    photoHint:    'Profile Photo',
     fullName:     'Full Name', nickname: 'Nickname',
     employeeId:   'Employee ID', department: 'Department',
     selectDept:   'Select department…',
-    phone:        'Mobile Phone Number',
-    phonePlaceholder: '08X-XXX-XXXX',
-    phoneHint:    'Your primary contact number',
     password:     'Password', pwPlaceholder: 'Min. 6 characters',
     confirm:      'Confirm Password', confirmPlaceholder: 'Repeat password',
     submit:       'Submit & Create Account',
@@ -40,24 +36,19 @@ const T = {
     errNick:      'Please enter your nickname.',
     errEmpId:     'Please enter your Employee ID.',
     errDept:      'Please select your department.',
-    errPhone:     'Please enter a valid Thai mobile number (10 digits).',
     errPwLen:     'Password must be at least 6 characters.',
     errPwMatch:   'Passwords do not match.',
     errPurpose:   'Please select a purpose of usage.',
-    errPhoneUsed: 'This ID or phone number is already registered.',
+    errPhoneUsed: 'This Employee ID is already registered.',
     errRegister:  'Registration failed. Please try again.',
-    errPhoto:     'Please upload a profile photo.',
   },
   th: {
     heading:      'สมัครใช้งาน',
     subHeading:   'กรอกข้อมูลของคุณ — แอดมินจะตรวจสอบและอนุมัติบัญชีของคุณ',
-    photoHint:    'รูปโปรไฟล์ *',
+    photoHint:    'รูปโปรไฟล์',
     fullName:     'ชื่อ-นามสกุล', nickname: 'ชื่อเล่น',
     employeeId:   'รหัสพนักงาน', department: 'แผนก',
     selectDept:   'เลือกแผนก…',
-    phone:        'หมายเลขโทรศัพท์มือถือ',
-    phonePlaceholder: '08X-XXX-XXXX',
-    phoneHint:    'หมายเลขโทรศัพท์หลักของคุณ',
     password:     'รหัสผ่าน', pwPlaceholder: 'อย่างน้อย 6 ตัวอักษร',
     confirm:      'ยืนยันรหัสผ่าน', confirmPlaceholder: 'กรอกรหัสผ่านอีกครั้ง',
     submit:       'สมัครและสร้างบัญชี',
@@ -74,13 +65,11 @@ const T = {
     errNick:      'กรุณากรอกชื่อเล่น',
     errEmpId:     'กรุณากรอกรหัสพนักงาน',
     errDept:      'กรุณาเลือกแผนก',
-    errPhone:     'กรุณากรอกหมายเลขมือถือไทย 10 หลักที่ถูกต้อง',
     errPwLen:     'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร',
     errPwMatch:   'รหัสผ่านไม่ตรงกัน',
     errPurpose:   'กรุณาเลือกวัตถุประสงค์การใช้งาน',
-    errPhoneUsed: 'รหัสพนักงานหรือหมายเลขโทรศัพท์นี้ลงทะเบียนแล้ว',
+    errPhoneUsed: 'รหัสพนักงานนี้ถูกลงทะเบียนแล้ว',
     errRegister:  'การสมัครล้มเหลว กรุณาลองใหม่',
-    errPhoto:     'กรุณาอัปโหลดรูปโปรไฟล์',
   },
 } as const;
 
@@ -111,7 +100,7 @@ export default function RegisterPage() {
   // ── State ─────────────────────────────────────────────────────────────────
   const [form, setForm] = useState({
     fullName: '', nickname: '', employeeId: '',
-    department: '', phone: '', password: '', confirmPassword: '',
+    department: '', password: '', confirmPassword: '',
     purpose: '',
   });
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -133,7 +122,18 @@ export default function RegisterPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setPhotoFile(file);
-    setPhotoPreview(URL.createObjectURL(file));
+    const objectUrl = URL.createObjectURL(file);
+    setPhotoPreview(objectUrl);
+    // Reset input value so onChange fires again if user picks the same file or re-opens camera
+    e.target.value = '';
+  };
+
+  const handlePhotoClick = () => {
+    if (fileRef.current) {
+      // Reset so onChange always fires on mobile (even if same file re-captured)
+      fileRef.current.value = '';
+      fileRef.current.click();
+    }
   };
 
   const validateInfo = (): string | null => {
@@ -141,12 +141,7 @@ export default function RegisterPage() {
     if (!form.nickname.trim())   return t.errNick;
     if (!form.employeeId.trim()) return t.errEmpId;
     if (!form.department)        return t.errDept;
-    if (form.phone.trim()) {
-      const digits = form.phone.replace(/\D/g, '');
-      if (digits.length < 9 || digits.length > 11) return t.errPhone;
-    }
     if (!form.purpose)           return t.errPurpose;
-    if (!photoFile)              return t.errPhoto;
     if (form.password.length < 6)                return t.errPwLen;
     if (form.password !== form.confirmPassword)   return t.errPwMatch;
     return null;
@@ -161,7 +156,7 @@ export default function RegisterPage() {
     
     try {
       const data: PhoneRegisterData = {
-        phone: formatThaiPhone(form.phone),
+        phone: '',
         password: form.password,
         fullName: form.fullName,
         nickname: form.nickname,
@@ -223,20 +218,26 @@ export default function RegisterPage() {
           {/* Photo */}
           <div className={styles.photoSection}>
             <button type="button" id="photo-upload-btn" className={styles.photoButton}
-              onClick={() => fileRef.current?.click()} aria-label="Upload profile photo">
+              onClick={handlePhotoClick} aria-label="Upload profile photo">
               {photoPreview
                 ? <img src={photoPreview} alt="Preview" className={styles.photoPreview} />
                 : <div className={styles.photoPlaceholder}>
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
                     </svg>
-                    <span>Upload Photo</span>
+                    <span>{lang === 'th' ? 'อัปโหลดรูป' : 'Upload Photo'}</span>
                   </div>}
               <div className={styles.photoBadge}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>
               </div>
             </button>
-            <input ref={fileRef} type="file" accept="image/*" className={styles.hiddenInput} onChange={handlePhotoChange} />
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className={styles.hiddenInput}
+              onChange={handlePhotoChange}
+            />
             <p className={styles.photoHint}>{t.photoHint}</p>
           </div>
 
@@ -268,16 +269,7 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="reg-phone">{t.phone}</label>
-            <div className={styles.phoneInputWrap}>
-              <span className={styles.phonePrefix}>🇹🇭 +66</span>
-              <input id="reg-phone" type="tel" className={`form-input ${styles.phoneInput}`}
-                placeholder={t.phonePlaceholder} value={form.phone} onChange={set('phone')}
-                inputMode="tel" autoComplete="tel" />
-            </div>
-            <p className={styles.fieldHint}>{t.phoneHint}</p>
-          </div>
+
 
           <div className="form-group">
             <label className="form-label" htmlFor="reg-purpose">{t.purpose} *</label>
