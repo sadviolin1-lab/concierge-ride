@@ -183,23 +183,23 @@ export default function RegisterPage() {
   return (
     <div className={styles.page}>
       <div className={styles.card} role="main">
-        {/* Language toggle */}
-        <div className={styles.langToggleWrap}>
-          <LangToggle />
-        </div>
-
-        {/* Logo */}
-        <div className={styles.logoRow}>
-          <div className={styles.logoIcon} aria-hidden>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <circle cx="12" cy="12" r="10" />
-              <circle cx="12" cy="12" r="2.5" fill="currentColor" />
-              <line x1="12" y1="2" x2="12" y2="9.5" />
-              <line x1="12" y1="12" x2="4" y2="17" />
-              <line x1="12" y1="12" x2="20" y2="17" />
-            </svg>
+        {/* Header row: Logo & Language toggle */}
+        <div className={styles.headerRow}>
+          <div className={styles.logoRow}>
+            <div className={styles.logoIcon} aria-hidden>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <circle cx="12" cy="12" r="10" />
+                <circle cx="12" cy="12" r="2.5" fill="currentColor" />
+                <line x1="12" y1="2" x2="12" y2="9.5" />
+                <line x1="12" y1="12" x2="4" y2="17" />
+                <line x1="12" y1="12" x2="20" y2="17" />
+              </svg>
+            </div>
+            <span className={styles.logoTitle}>Concierge Ride</span>
           </div>
-          <span className={styles.logoTitle}>Concierge Ride</span>
+          <div className={styles.langToggleWrap}>
+            <LangToggle />
+          </div>
         </div>
 
         {/* Error banner */}
