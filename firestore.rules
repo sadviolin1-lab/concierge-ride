@@ -12,12 +12,16 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    function userDocExists() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
     function getUserData() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
     function hasRole(role) {
-      return isSignedIn() && getUserData().role == role;
+      return userDocExists() && getUserData().role == role;
     }
 
     function isMasterAdmin() {
@@ -37,7 +41,7 @@ service cloud.firestore {
     }
 
     function isActive() {
-      return isSignedIn() && getUserData().status == 'active';
+      return userDocExists() && getUserData().status == 'active';
     }
 
     // ── Admin Bypass ─────────────────────────────────────────────────
@@ -52,7 +56,8 @@ service cloud.firestore {
       // Users can read their own profile; Admin, Driver, and HR can read all
       allow read: if isUser(uid) || (isActive() && (isAdmin() || isDriver() || isHR()));
 
-      // Only the user themselves can create their own profile (on registration)
+      // Any authenticated user can create their OWN profile document (on registration)
+      // This must work even when no Firestore document exists yet
       allow create: if isUser(uid);
 
       // Users can update their own profile (limited); Admin and HR can update any except Master Admin
