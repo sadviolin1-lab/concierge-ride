@@ -292,12 +292,29 @@ export default function NewRequestPage() {
 
       const validDestinations = destinations.filter(d => (d.title || d.address).trim().length > 0);
 
-      const newReq: GeneralRequest & { attachments?: typeof attachmentUrls } = {
+      const cleanDestinations = validDestinations.map(d => {
+        const item: any = {
+          id: d.id || crypto.randomUUID(),
+          title: d.title || '',
+          address: d.address || '',
+          latLng: d.latLng ? { lat: d.latLng.lat, lng: d.latLng.lng } : null,
+        };
+        if (d.description) item.description = d.description;
+        if (d.hasPassengers) {
+          item.hasPassengers = true;
+          item.passengerCount = d.passengerCount || 1;
+          if (d.passengerName) item.passengerName = d.passengerName;
+          if (d.passengerContact) item.passengerContact = d.passengerContact;
+        }
+        return item;
+      });
+
+      const newReq: any = {
         id: newId,
         requesterId: userProfile.uid,
         requesterName: userProfile.fullName || userProfile.nickname || userProfile.email,
         requesterDepartment: userProfile.department || '',
-        requesterPhotoURL: userProfile.photoURL,
+        requesterPhotoURL: userProfile.photoURL || null,
         type,
         typeLabel: t.types[type]?.label || type,
         title: title.trim(),
@@ -306,7 +323,7 @@ export default function NewRequestPage() {
         destinationLatLng: isUrgentMode ? null : (validDestinations[0]?.latLng || null),
         destinations: isUrgentMode 
           ? [{ id: crypto.randomUUID(), title: quickDestination.trim(), address: quickDestination.trim(), latLng: null }] 
-          : validDestinations,
+          : cleanDestinations,
         requestedDate,
         requestedTime,
         status: isUrgentMode ? 'urgent_pending' : 'pending',
@@ -317,13 +334,20 @@ export default function NewRequestPage() {
         contactType,
         contactName: contactName.trim(),
         contactPhone: contactPhone.trim(),
-        contactNote: contactNote.trim() || undefined,
         isUrgent: isUrgentMode,
-        urgentReason: isUrgentMode ? urgentReason.trim() : undefined,
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        ...(attachmentUrls.length > 0 && { attachments: attachmentUrls }),
       };
+
+      if (contactNote.trim()) {
+        newReq.contactNote = contactNote.trim();
+      }
+      if (isUrgentMode && urgentReason.trim()) {
+        newReq.urgentReason = urgentReason.trim();
+      }
+      if (attachmentUrls.length > 0) {
+        newReq.attachments = attachmentUrls;
+      }
 
       await setDoc(doc(db, 'requests', newId), newReq);
       router.push('/requests');
