@@ -193,6 +193,7 @@ export default function ApprovalsPage() {
   }, [userProfile, isAdmin, isMasterAdmin, isDriver, router]);
 
   const fetchRequests = useCallback(async () => {
+    if (!userProfile || (!isAdmin && !isMasterAdmin && !isDriver)) return;
     setLoading(true);
     try {
       const q = query(
@@ -201,10 +202,12 @@ export default function ApprovalsPage() {
       );
       const snap = await getDocs(q);
       setRequests(snap.docs.map(d => ({ ...(d.data() as GeneralRequest), id: d.id })));
+    } catch (err) {
+      console.error('Failed to fetch requests:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userProfile, isAdmin, isMasterAdmin, isDriver]);
 
   useEffect(() => { fetchRequests(); }, [fetchRequests]);
 

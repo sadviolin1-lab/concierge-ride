@@ -11,6 +11,7 @@ import type { EmploymentType } from '@/lib/types';
 import { useLang, type Lang } from '@/lib/use-lang';
 import LangToggle from '@/components/LangToggle';
 import styles from './register.module.css';
+import AppLogo from '@/components/AppLogo';
 
 // ── Bilingual text ────────────────────────────────────────────────────────────
 const T = {
@@ -183,11 +184,19 @@ export default function RegisterPage() {
         employmentType: form.employmentType || 'employee',
       };
       await completeDirectRegistration(data);
-      router.replace('/pending');
+      // Use full page reload to avoid dashboard layout intercepting the navigation
+      window.location.href = '/pending';
     } catch (err: any) {
-      const msg = err.message || '';
-      if (msg.includes('email-already-in-use')) setError(t.errPhoneUsed);
-      else setError(t.errRegister);
+      console.error('[Register] Registration error:', err);
+      const code = err?.code || '';
+      const msg = err?.message || '';
+      if (code === 'auth/email-already-in-use' || msg.includes('email-already-in-use')) {
+        setError(t.errPhoneUsed);
+      } else if (code === 'permission-denied' || msg.includes('permission-denied')) {
+        setError(lang === 'th' ? 'ไม่มีสิทธิ์บันทึกข้อมูล กรุณาติดต่อ Admin' : 'Permission denied. Please contact Admin.');
+      } else {
+        setError(t.errRegister + (msg ? ` (${code || msg})` : ''));
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -200,15 +209,7 @@ export default function RegisterPage() {
         {/* Header row: Logo & Language toggle */}
         <div className={styles.headerRow}>
           <div className={styles.logoRow}>
-            <div className={styles.logoIcon} aria-hidden>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <circle cx="12" cy="12" r="10" />
-                <circle cx="12" cy="12" r="2.5" fill="currentColor" />
-                <line x1="12" y1="2" x2="12" y2="9.5" />
-                <line x1="12" y1="12" x2="4" y2="17" />
-                <line x1="12" y1="12" x2="20" y2="17" />
-              </svg>
-            </div>
+            <AppLogo size={44} style={{ borderRadius: '12px' }} />
             <span className={styles.logoTitle}>Concierge Ride</span>
           </div>
           <div className={styles.langToggleWrap}>
@@ -222,7 +223,16 @@ export default function RegisterPage() {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, marginTop: 1 }}>
               <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
             </svg>
-            {error}
+            <div style={{ flex: 1 }}>
+              {error}
+              {error === t.errPhoneUsed && (
+                <div style={{ marginTop: '6px', fontSize: '0.85rem' }}>
+                  <Link href="/login" style={{ textDecoration: 'underline', fontWeight: 600, color: 'inherit' }}>
+                    {lang === 'th' ? '👉 คลิกที่นี่เพื่อเข้าสู่ระบบ (Sign In)' : '👉 Click here to Sign In'}
+                  </Link>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

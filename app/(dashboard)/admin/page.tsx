@@ -103,6 +103,8 @@ export default function AdminPage() {
         totalRequests: requests.length,
         totalShuttleBookings,
       });
+    } catch (err) {
+      console.error('Failed to fetch admin stats:', err);
     } finally {
       setLoading(false);
     }

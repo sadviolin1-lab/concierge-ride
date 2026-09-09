@@ -8,10 +8,6 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isUser(uid) {
-      return isSignedIn() && request.auth.uid == uid;
-    }
-
     function userDocExists() {
       return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
     }
@@ -37,85 +33,38 @@ service cloud.firestore {
     }
 
     function isHR() {
-      return hasRole('hr');
-    }
-
-    function isActive() {
-      return userDocExists() && getUserData().status == 'active';
-    }
-
-    // ── Admin Bypass ─────────────────────────────────────────────────
-    // If a user is an admin, they have full access to everything.
-    // This avoids query validation issues with list queries.
-    match /{document=**} {
-      allow read, write: if isMasterAdmin();
+      return hasRole('hr') || isAdmin();
     }
 
     // ── Users collection ─────────────────────────────────────────────
     match /users/{uid} {
-      // Users can read their own profile; Admin, Driver, and HR can read all
-      allow read: if isUser(uid) || (isActive() && (isAdmin() || isDriver() || isHR()));
-
-      // Any authenticated user can create their OWN profile document (on registration)
-      // This must work even when no Firestore document exists yet
-      allow create: if isUser(uid);
-
-      // Users can update their own profile (limited); Admin and HR can update any except Master Admin
-      allow update: if isUser(uid) || (isActive() && (isAdmin() || isHR()) && resource.data.role != 'master_admin' && request.resource.data.role != 'master_admin');
-
-      // Admin and HR can delete user profiles except Master Admin
-      allow delete: if isActive() && (isAdmin() || isHR()) && resource.data.role != 'master_admin';
+      allow read: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isSignedIn() && (isAdmin() || isHR());
     }
 
     // ── Settings collection ──────────────────────────────────────────
     match /settings/{settingId} {
-      // Any active user can read settings (like shuttle availability)
-      allow read: if isActive();
+      allow read: if true;
+      allow write: if isSignedIn();
     }
 
     // ── Shuttle Rides ─────────────────────────────────────────────────
     match /shuttleRides/{rideId} {
-      // Any active user can read ride data (to see seat availability)
-      allow read: if isActive();
-
-      // Drivers and admins can create rides (assign vehicles to shifts)
-      allow create: if isActive() && isDriver();
-
-      // Any active user can update (to book/cancel a seat)
-      // Drivers/admin can also update vehicle type
-      allow update: if isActive();
-
-      // Only admin can delete rides
-      allow delete: if isActive() && isAdmin();
+      allow read: if true;
+      allow create, update, delete: if isSignedIn();
     }
 
     // ── General Requests ─────────────────────────────────────────────
     match /requests/{requestId} {
-      // Requester can read their own; Driver/Admin/HR can read all
-      allow read: if isActive() && (
-        isDriver() || isHR() || resource.data.requesterId == request.auth.uid
-      );
-
-      // Any active staff/hr/admin can create requests
-      allow create: if isActive();
-
-      // Driver/Admin can update (approve/reject/start/complete)
-      allow update: if isActive() && isDriver();
-
-      // Only admin can delete
-      allow delete: if isActive() && isAdmin();
+      allow read: if true;
+      allow create, update, delete: if isSignedIn();
     }
 
     // ── Vehicles collection ───────────────────────────────────────────
     match /vehicles/{vehicleId} {
-      // Any active user can read vehicle list
-      allow read: if isActive();
-
-      // Driver/Admin can update vehicles (drivers toggle isActive)
-      allow update: if isActive() && isDriver();
-
-      // Only admin can create or delete vehicles
-      allow create, delete: if isActive() && isAdmin();
+      allow read: if true;
+      allow create, update, delete: if isSignedIn();
     }
   }
 }

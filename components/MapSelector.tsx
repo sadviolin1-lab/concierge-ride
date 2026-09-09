@@ -1235,65 +1235,59 @@ export default function MapSelector({ destinations, onDestinationsChange, maxSto
                       </button>
                     </div>
 
-                    {/* Place Name Title & Coordinates */}
-                    <div className={styles.searchSection}>
-                      <input
-                        type="text"
-                        placeholder={`${t.placeNameHint} *`}
-                        className={styles.stopTitleInput}
-                        value={dest.title || ''}
-                        onChange={e => updateField(index, 'title', e.target.value)}
-                        required
-                        style={{ width: '100%', boxSizing: 'border-box' }}
-                      />
-
-                      {/* Coordinates info pill */}
-                      {hasCoords ? (
-                        <div className={styles.coordsBadge}>
-                          <span style={{ flexShrink: 0 }}>📌</span>
-                          <span className={styles.coordsText}>
-                            {dest.latLng!.lat.toFixed(5)}, {dest.latLng!.lng.toFixed(5)}
+                    {/* Confirmed location pill — shown after a location is selected */}
+                    {hasCoords ? (
+                      <div className={styles.coordsBadge}>
+                        <span style={{ flexShrink: 0 }}>📌</span>
+                        {dest.title && (
+                          <span style={{ fontWeight: 700, color: 'var(--color-text-1)', fontSize: '0.82rem', flexShrink: 0 }}>
+                            {dest.title}
                           </span>
-                          <span className={styles.coordsAddress} title={dest.address}>
-                            — {dest.address}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setPickerStopIndex(index)}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              color: 'var(--color-primary, #0284c7)',
-                              cursor: 'pointer',
-                              fontSize: '0.74rem',
-                              fontWeight: 600,
-                              padding: '2px 6px',
-                              textDecoration: 'underline',
-                              flexShrink: 0,
-                            }}
-                            title="แก้ไขพิกัดบนแผนที่"
-                          >
-                            {lang === 'th' ? 'ปรับพิกัด' : 'Edit Pin'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newDests = [...destinations];
-                              newDests[index] = { ...newDests[index], latLng: null, address: '' };
-                              onDestinationsChange(newDests);
-                            }}
-                            title={t.clearCoords}
-                            className={styles.clearCoordsBtn}
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ) : (
-                        <div className={styles.pinHintText}>
-                          💡 ค้นหาสถานที่, กด &ldquo;📍 ปักหมุดบนแผนที่&rdquo; หรือกด &ldquo;🎯 ตำแหน่งปัจจุบัน&rdquo;
-                        </div>
-                      )}
-                    </div>
+                        )}
+                        <span className={styles.coordsText}>
+                          {dest.latLng!.lat.toFixed(5)}, {dest.latLng!.lng.toFixed(5)}
+                        </span>
+                        <span className={styles.coordsAddress} title={dest.address}>
+                          — {dest.address}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setPickerStopIndex(index)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--color-primary, #0284c7)',
+                            cursor: 'pointer',
+                            fontSize: '0.74rem',
+                            fontWeight: 600,
+                            padding: '2px 6px',
+                            textDecoration: 'underline',
+                            flexShrink: 0,
+                          }}
+                          title="แก้ไขพิกัดบนแผนที่"
+                        >
+                          {lang === 'th' ? 'ปรับพิกัด' : 'Edit Pin'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newDests = [...destinations];
+                            newDests[index] = { ...newDests[index], latLng: null, address: '', title: '' };
+                            onDestinationsChange(newDests);
+                          }}
+                          title={t.clearCoords}
+                          className={styles.clearCoordsBtn}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <div className={styles.pinHintText}>
+                        💡 {lang === 'th'
+                          ? 'ค้นหาสถานที่, กด "📍 ปักหมุดบนแผนที่" หรือกด "🎯 ตำแหน่งปัจจุบัน"'
+                          : 'Search a place, pick on map, or use GPS to pin this stop'}
+                      </div>
+                    )}
 
                     {/* Driver Task Note & Passengers Row */}
                     <div className={styles.stopDetailsRow}>

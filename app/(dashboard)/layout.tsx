@@ -8,6 +8,7 @@ import Sidebar from '@/components/Sidebar';
 import BottomNav from '@/components/BottomNav';
 import ViewAsDropdown from '@/components/ViewAsDropdown';
 import LangToggle from '@/components/LangToggle';
+import AppLogo from '@/components/AppLogo';
 import styles from './dashboard-layout.module.css';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -39,25 +40,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (loading || !userProfile || userProfile.status !== 'active') {
     return (
       <div className="page-loader">
-        <div className="spinner" />
+        <AppLogo size={48} style={{ marginBottom: 12 }} />
         <span className="logo-text">Concierge Ride</span>
-        <button
-          type="button"
-          onClick={() => { window.location.href = '/login'; }}
-          style={{
-            marginTop: 16,
-            fontSize: '0.85rem',
-            color: 'var(--color-primary, #0284C7)',
-            background: 'rgba(2, 132, 199, 0.08)',
-            border: '1px solid rgba(2, 132, 199, 0.2)',
-            padding: '6px 14px',
-            borderRadius: '20px',
-            fontWeight: 600,
-            cursor: 'pointer'
-          }}
-        >
-          Sign in
-        </button>
+        {/* Only show Sign in button after auth check is complete, not during loading */}
+        {!loading && (
+          <button
+            type="button"
+            onClick={() => { window.location.href = '/login'; }}
+            style={{
+              marginTop: 16,
+              fontSize: '0.85rem',
+              color: 'var(--color-primary, #0284C7)',
+              background: 'rgba(2, 132, 199, 0.08)',
+              border: '1px solid rgba(2, 132, 199, 0.2)',
+              padding: '6px 14px',
+              borderRadius: '20px',
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            Sign in
+          </button>
+        )}
       </div>
     );
   }
@@ -68,15 +72,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className={styles.desktopHeaderSpacer}></div>
       <header className={styles.desktopHeader}>
         <div className={styles.headerLogoArea}>
-          <div className={styles.headerLogoIcon} aria-hidden>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <circle cx="12" cy="12" r="10" />
-              <circle cx="12" cy="12" r="2.5" fill="currentColor" />
-              <line x1="12" y1="2" x2="12" y2="9.5" />
-              <line x1="12" y1="12" x2="4" y2="17" />
-              <line x1="12" y1="12" x2="20" y2="17" />
-            </svg>
-          </div>
+          <AppLogo size={38} style={{ borderRadius: '10px' }} />
           <div>
             <div className={styles.headerLogoText}>{lang === 'en' ? 'Concierge Ride' : 'คอนเซียร์จ ไรด์'}</div>
             <div className={styles.headerLogoTagline}>{lang === 'en' ? 'Transport Manager' : 'ระบบจัดการรถรับส่ง'}</div>
@@ -129,13 +125,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <header className={styles.mobileHeaderLarge}>
             <div className={styles.headerTop}>
               <div className={styles.logoWrapper}>
-                <svg className={styles.steeringWheelIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <circle cx="12" cy="12" r="10" />
-                  <circle cx="12" cy="12" r="2.5" fill="currentColor" />
-                  <line x1="12" y1="2" x2="12" y2="9.5" />
-                  <line x1="12" y1="12" x2="4" y2="17" />
-                  <line x1="12" y1="12" x2="20" y2="17" />
-                </svg>
+                <AppLogo size={34} style={{ borderRadius: '8px' }} />
                 <span className={styles.mobileLogoTextWhite}>Concierge Ride</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

@@ -99,7 +99,11 @@ export default function HomePage() {
     const role = userProfile?.role;
     if (role === 'admin' || role === 'master_admin' || role === 'hr') {
       const q = query(collection(db, 'users'), where('status', '==', 'pending'));
-      return onSnapshot(q, snap => setPendingCount(snap.size));
+      return onSnapshot(
+        q,
+        snap => setPendingCount(snap.size),
+        _err => setPendingCount(0)
+      );
     }
   }, [userProfile?.role]);
 
@@ -127,12 +131,18 @@ export default function HomePage() {
       );
     }
 
-    const unsub = onSnapshot(q, snap => {
-      setActiveRequests(snap.docs.map(d => d.data() as GeneralRequest));
-      setLoadingReqs(false);
-    });
+    const unsub = onSnapshot(
+      q,
+      snap => {
+        setActiveRequests(snap.docs.map(d => d.data() as GeneralRequest));
+        setLoadingReqs(false);
+      },
+      _err => {
+        setLoadingReqs(false);
+      }
+    );
     return unsub;
-  }, [userProfile?.uid, isAdmin, isMasterAdmin]);
+  }, [userProfile?.uid, isAdmin, isMasterAdmin, isDriver]);
 
   const handleHomeAction = async (reqId: string, action: 'approve' | 'reject' | 'reschedule' | 'bolt') => {
     if (!userProfile) return;

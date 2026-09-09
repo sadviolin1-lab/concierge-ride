@@ -12,6 +12,7 @@ import ViewAsDropdown from '@/components/ViewAsDropdown';
 import LangToggle from '@/components/LangToggle';
 import styles from './sidebar.module.css';
 import { useNavigationItems } from '@/lib/navigation';
+import AppLogo from '@/components/AppLogo';
 
 const SIDEBAR_LANG = {
   en: {
@@ -39,9 +40,11 @@ export default function Sidebar({ mobile = false, onClose }: { mobile?: boolean;
   useEffect(() => {
     if (role === 'admin' || role === 'master_admin' || role === 'hr') {
       const q = query(collection(db, 'users'), where('status', '==', 'pending'));
-      const unsubscribe = onSnapshot(q, (snap) => {
-        setPendingCount(snap.size);
-      });
+      const unsubscribe = onSnapshot(
+        q,
+        (snap) => { setPendingCount(snap.size); },
+        (_err) => { setPendingCount(0); }
+      );
       return () => unsubscribe();
     }
   }, [role]);
@@ -57,15 +60,7 @@ export default function Sidebar({ mobile = false, onClose }: { mobile?: boolean;
     <aside className={`${styles.sidebar} ${mobile ? styles.sidebarMobile : ''}`}>
       {/* Logo */}
       <div className={styles.logoArea}>
-        <div className={styles.logoIcon} aria-hidden>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <circle cx="12" cy="12" r="10" />
-            <circle cx="12" cy="12" r="2.5" fill="currentColor" />
-            <line x1="12" y1="2" x2="12" y2="9.5" />
-            <line x1="12" y1="12" x2="4" y2="17" />
-            <line x1="12" y1="12" x2="20" y2="17" />
-          </svg>
-        </div>
+        <AppLogo size={40} style={{ borderRadius: '10px' }} />
         <div>
           <div className={styles.logoName}>{t.title}</div>
           <div className={styles.logoTagline}>{t.tagline}</div>

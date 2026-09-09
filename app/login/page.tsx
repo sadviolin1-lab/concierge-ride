@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useLang } from '@/lib/use-lang';
 import LangToggle from '@/components/LangToggle';
 import styles from './login.module.css';
+import AppLogo from '@/components/AppLogo';
 
 // ── สองภาษา / Bilingual text ─────────────────────────────────────────────────
 const LANG = {
@@ -111,15 +112,7 @@ export default function LoginPage() {
         {/* Header row: Logo & Language Toggle */}
         <div className={styles.headerRow}>
           <div className={styles.logo}>
-            <div className={styles.logoIcon} aria-hidden>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <circle cx="12" cy="12" r="10" />
-                <circle cx="12" cy="12" r="2.5" fill="currentColor" />
-                <line x1="12" y1="2" x2="12" y2="9.5" />
-                <line x1="12" y1="12" x2="4" y2="17" />
-                <line x1="12" y1="12" x2="20" y2="17" />
-              </svg>
-            </div>
+          <AppLogo size={44} style={{ borderRadius: '12px' }} />
             <div style={{ minWidth: 0 }}>
               <h1 className={styles.logoTitle}>Concierge Ride</h1>
               <p className={styles.logoSub}>{t.sub}</p>

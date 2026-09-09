@@ -165,6 +165,7 @@ export default function ReportsPage() {
   }, [selectedMonth]);
 
   const fetchData = useCallback(async () => {
+    if (!userProfile || (!isAdmin && !isDriver && !isHR)) return;
     setLoading(true);
     try {
       const [requestsSnap, ridesSnap, usersSnap] = await Promise.all([

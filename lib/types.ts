@@ -160,6 +160,7 @@ export interface GeneralRequest {
   contactType?: 'self' | 'other';
   contactName?: string;
   contactPhone?: string;
+  contactNote?: string;
   isUrgent?: boolean;
   urgentReason?: string;
   urgentApprovalNote?: string;

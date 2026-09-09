@@ -25,7 +25,7 @@ const LANG = {
       photoURL: 'Profile Picture',
       changePhoto: 'Change Picture',
       uploading: 'Uploading…',
-      phone: 'Phone Number *',
+      phone: 'Phone Number',
       employeeId: 'Employee ID (Read Only)',
     },
     crop: { title: 'Crop Profile Picture', cancel: 'Cancel', apply: 'Apply' },
@@ -60,7 +60,7 @@ const LANG = {
       photoURL: 'รูปโปรไฟล์',
       changePhoto: 'เปลี่ยนรูปภาพ',
       uploading: 'กำลังอัปโหลด…',
-      phone: 'เบอร์โทรศัพท์ *',
+      phone: 'เบอร์โทรศัพท์',
       employeeId: 'รหัสพนักงาน (แก้ไขไม่ได้)',
     },
     crop: { title: 'ครอปรูปโปรไฟล์', cancel: 'ยกเลิก', apply: 'ตกลง' },
@@ -181,9 +181,9 @@ export default function ProfilePage() {
     if (!userProfile) return;
 
     const cleanedLocal = localPhone.trim().replace(/^0+/, ''); // Remove leading zeros
-    const finalPhone = countryCode + cleanedLocal;
+    const finalPhone = cleanedLocal ? countryCode + cleanedLocal : '';
 
-    if (!fullName.trim() || !department.trim() || !localPhone.trim()) {
+    if (!fullName.trim() || !department.trim()) {
       setMessage({ text: t.error, type: 'error' });
       return;
     }
@@ -458,7 +458,6 @@ export default function ProfilePage() {
                 value={localPhone} 
                 onChange={e => setLocalPhone(e.target.value)} 
                 placeholder="812345678"
-                required 
                 style={{ flex: 1, height: '42px' }}
               />
             </div>

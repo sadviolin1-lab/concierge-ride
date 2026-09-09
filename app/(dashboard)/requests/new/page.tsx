@@ -60,6 +60,8 @@ const LANG = {
       contactOther: '👥 Contact Someone Else',
       contactName: 'Contact Name',
       contactPhone: 'Phone Number',
+      contactNote: 'Notes for Driver',
+      contactNotePlaceholder: 'e.g. Call before arriving, meet at lobby, bring ID…  (optional)',
       attachLabel: 'Attachments',
       attachHint: 'Photos, bills, receipts, or sample documents (max 5 files)',
       attachBtn: 'Add Files / Photos',
@@ -125,6 +127,8 @@ const LANG = {
       contactOther: '👥 ติดต่อผู้อื่น',
       contactName: 'ชื่อผู้ติดต่อ',
       contactPhone: 'เบอร์โทรศัพท์',
+      contactNote: 'หมายเหตุถึงคนขับ',
+      contactNotePlaceholder: 'เช่น โทรก่อนถึง, รับที่ล็อบบี้, ต้องนำบัตรประชาชนไปด้วย…  (ไม่บังคับ)',
       attachLabel: 'ไฟล์แนบ',
       attachHint: 'รูปถ่าย บิล ใบเสร็จ หรือเอกสารอ้างอิง (สูงสุด 5 ไฟล์)',
       attachBtn: 'แนบไฟล์ / รูปภาพ',
@@ -180,11 +184,15 @@ export default function NewRequestPage() {
   const [contactType, setContactType] = useState<'self' | 'other'>('self');
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
+  const [contactNote, setContactNote] = useState('');
 
   useEffect(() => {
-    if (userProfile && contactType === 'self') {
-      setContactName(userProfile.fullName || userProfile.nickname || '');
-      setContactPhone(userProfile.phone || '');
+    if (contactType === 'self') {
+      setContactName(userProfile?.fullName || userProfile?.nickname || '');
+      setContactPhone(userProfile?.phone || '');
+    } else {
+      setContactName('');
+      setContactPhone('');
     }
   }, [userProfile, contactType]);
 
@@ -250,7 +258,8 @@ export default function NewRequestPage() {
         return;
       }
 
-      const missingTitle = validDestinations.some(d => !d.title || !d.title.trim());
+      // title is auto-filled from address search; fall back to address if missing
+      const missingTitle = validDestinations.some(d => (!d.title || !d.title.trim()) && (!d.address || !d.address.trim()));
       if (missingTitle) {
         setError('fillAll');
         return;
@@ -308,6 +317,7 @@ export default function NewRequestPage() {
         contactType,
         contactName: contactName.trim(),
         contactPhone: contactPhone.trim(),
+        contactNote: contactNote.trim() || undefined,
         isUrgent: isUrgentMode,
         urgentReason: isUrgentMode ? urgentReason.trim() : undefined,
         createdAt: Date.now(),
@@ -592,8 +602,8 @@ export default function NewRequestPage() {
                     className="form-input"
                     value={contactName}
                     onChange={e => setContactName(e.target.value)}
-                    disabled={contactType === 'self' || loading}
-                    placeholder="Enter name"
+                    disabled={loading}
+                    placeholder={lang === 'th' ? 'ชื่อผู้ติดต่อ' : 'Contact name'}
                     required
                   />
                 </div>
@@ -604,11 +614,26 @@ export default function NewRequestPage() {
                     className="form-input"
                     value={contactPhone}
                     onChange={e => setContactPhone(e.target.value)}
-                    disabled={contactType === 'self' || loading}
-                    placeholder="e.g. 0812345678"
+                    disabled={loading}
+                    placeholder={lang === 'th' ? 'เช่น 0812345678' : 'e.g. 0812345678'}
                     required
                   />
                 </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {t.form.contactNote}
+                  <span className={styles.optBadge} style={{ marginLeft: 4 }}>{lang === 'th' ? 'ไม่บังคับ' : 'Optional'}</span>
+                </label>
+                <textarea
+                  className="form-input"
+                  value={contactNote}
+                  onChange={e => setContactNote(e.target.value)}
+                  placeholder={t.form.contactNotePlaceholder}
+                  rows={2}
+                  disabled={loading}
+                />
               </div>
             </div>
 

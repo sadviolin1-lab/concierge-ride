@@ -136,6 +136,10 @@ function ShuttlePageInner() {
   const t = LANG[lang];
   const shifts = SHIFTS[lang];
 
+  const defaultLocationsForShift = (shift: ShiftType): ('dormitory' | 'kathu')[] => {
+    return shift === 'day' ? ['dormitory'] : ['dormitory', 'kathu'];
+  };
+
   const [selectedDate, setSelectedDate] = useState(tomorrowStr());
   const [selectedShift, setSelectedShift] = useState<ShiftType>('morning');
   const [ride, setRide] = useState<ShuttleRide | null>(null);
@@ -146,7 +150,7 @@ function ShuttlePageInner() {
     shift: selectedShift, 
     date: selectedDate, 
     seats: [], 
-    availableLocations: ['dormitory', 'kathu'] as ('dormitory'|'kathu')[], 
+    availableLocations: defaultLocationsForShift(selectedShift), 
     isClosed: false, 
     isForceOpened: false 
   } as unknown as ShuttleRide;
@@ -163,6 +167,13 @@ function ShuttlePageInner() {
   const [bookingDirection, setBookingDirection] = useState<'inbound' | 'outbound' | 'roundtrip'>('inbound');
   const [bookingLocation, setBookingLocation] = useState<'dormitory' | 'kathu'>('dormitory');
   const [viewDirection, setViewDirection] = useState<'inbound' | 'outbound'>('inbound');
+
+  useEffect(() => {
+    setAssignLocations(defaultLocationsForShift(selectedShift));
+    if (selectedShift === 'day') {
+      setBookingLocation('dormitory');
+    }
+  }, [selectedShift]);
 
   // Roll-Call state
   const [isRollCallModalOpen, setIsRollCallModalOpen] = useState(false);
@@ -263,7 +274,7 @@ function ShuttlePageInner() {
           inboundVehicleType: defInbound,
           outboundVehicleType: defOutbound,
           totalSeats: VEHICLE_CONFIGS[defInbound].totalSeats,
-          availableLocations: ['dormitory', 'kathu'],
+          availableLocations: defaultLocationsForShift(selectedShift),
           isClosed: false,
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -470,7 +481,7 @@ function ShuttlePageInner() {
           id: docId,
           shift: selectedShift,
           date: selectedDate,
-          availableLocations: ['dormitory', 'kathu'] as ('dormitory' | 'kathu')[],
+          availableLocations: defaultLocationsForShift(selectedShift),
           isClosed: false,
           isForceOpened: false,
         }),
@@ -1026,7 +1037,7 @@ function ShuttlePageInner() {
                     <span>{shifts.find(s => s.key === renderRide.shift)?.time}</span>
                   </div>
 
-                  {isDriver && (
+                  {isDriver && selectedShift !== 'day' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: 'var(--color-bg-2)', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--color-border)' }}>
                       <span style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--color-text-2)' }}>
                         {lang === 'en' ? 'Available Booking Locations:' : 'จุดบริการที่เปิดให้จอง:'}
@@ -1140,7 +1151,9 @@ function ShuttlePageInner() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         <span style={{ color: 'var(--color-text-2)', fontSize: '0.75rem', fontWeight: 600 }}>{lang === 'en' ? 'BY LOCATION' : 'ตามจุดรับส่ง'}</span>
                         <span>{lang === 'en' ? 'Dormitory:' : 'หอพัก:'} <strong>{renderRide.seats.filter(s => s.location === 'dormitory').length}</strong></span>
-                        <span>{lang === 'en' ? 'Kathu:' : 'กะทู้:'} <strong>{renderRide.seats.filter(s => s.location === 'kathu').length}</strong></span>
+                        {selectedShift !== 'day' && (
+                          <span>{lang === 'en' ? 'Kathu:' : 'กะทู้:'} <strong>{renderRide.seats.filter(s => s.location === 'kathu').length}</strong></span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1197,7 +1210,7 @@ function ShuttlePageInner() {
                             <input type="radio" name="mainLoc" checked={bookingLocation === 'dormitory'} onChange={() => setBookingLocation('dormitory')} /> 
                             {lang === 'en' ? 'Staff Dormitory' : 'หอพนักงาน'}
                           </label>
-                          {(renderRide.availableLocations?.includes('kathu') || !renderRide.availableLocations) && (
+                          {selectedShift !== 'day' && (renderRide.availableLocations?.includes('kathu') || !renderRide.availableLocations) && (
                             <label style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
                               <input type="radio" name="mainLoc" checked={bookingLocation === 'kathu'} onChange={() => setBookingLocation('kathu')} /> 
                               {lang === 'en' ? 'Kathu Pick-up' : 'จุดรับส่งกะทู้'}

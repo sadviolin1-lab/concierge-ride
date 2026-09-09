@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { collection, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, doc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { useAuth, formatThaiPhone } from '@/lib/auth-context';
 import type { UserProfile, UserRole, UserStatus, EmploymentType } from '@/lib/types';
@@ -336,23 +336,25 @@ export default function ManageUsersPage() {
     if (userProfile && !hasAccess) router.replace('/home');
   }, [userProfile, hasAccess, router]);
 
-  const fetchUsers = useCallback(async () => {
-    setLoading(true);
-    try {
-      const snap = await getDocs(collection(db, 'users'));
-      const list = snap.docs.map(d => d.data() as UserProfile);
-      list.sort((a, b) => b.createdAt - a.createdAt);
-      setUsers(list);
-    } catch (err) {
-      console.error('Failed to fetch users:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+  // Real-time user list listener
   useEffect(() => {
-    if (hasAccess) fetchUsers();
-  }, [hasAccess, fetchUsers]);
+    if (!hasAccess) return;
+    setLoading(true);
+    const unsub = onSnapshot(
+      collection(db, 'users'),
+      (snap) => {
+        const list = snap.docs.map(d => d.data() as UserProfile);
+        list.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+        setUsers(list);
+        setLoading(false);
+      },
+      (err) => {
+        console.error('Failed to listen to users:', err);
+        setLoading(false);
+      }
+    );
+    return () => unsub();
+  }, [hasAccess]);
 
   const patchUser = async (uid: string, data: Partial<UserProfile>) => {
     if (userProfile && uid === userProfile.uid && data.status === 'suspended') {

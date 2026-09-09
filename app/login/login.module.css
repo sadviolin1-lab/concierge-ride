@@ -49,6 +49,25 @@
     box-shadow: none;
     background: transparent;
   }
+  .headerRow {
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+  .logo {
+    max-width: calc(100% - 120px);
+  }
+  .logoTitle {
+    font-size: 0.95rem;
+    white-space: normal;
+    word-break: break-word;
+  }
+  .logoSub {
+    font-size: 0.7rem;
+    white-space: normal;
+  }
+  .langToggleWrap {
+    flex-shrink: 0;
+  }
 }
 
 /* Logo block */

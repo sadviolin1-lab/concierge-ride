@@ -145,7 +145,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setUserProfile(profile);
             } else {
               setUserProfile(null);
-              firebaseSignOut(auth).catch(() => {});
             }
             setLoading(false);
           }, (error) => {
